@@ -1,0 +1,41 @@
+# macOS / OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# Editor & IDE directories
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node / npx (if running `npx skills` locally)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+
+# OpenCode / local agent runtime artifacts & logs
+*.log
+.opencode/cache/
+.opencode/tmp/
+
+# Temporary / scratch files
+tmp/
+temp/
+*.tmp
+*.bak
