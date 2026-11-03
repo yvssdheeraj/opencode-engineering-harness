@@ -7,11 +7,11 @@ description: Use when the affected system uses PostgreSQL and the task changes s
 
 ## Supported scope
 
-- Technology and version range: PostgreSQL 14–17+ (inspect the repository's actual server version, Docker/Compose manifests, or cloud database config before using version-specific SQL features).
+- Technology and version range: PostgreSQL 14–18+ (inspect the repository's actual server version, Docker/Compose manifests, or cloud database config before using version-specific SQL features).
 - Last reviewed: 2026-11
 - Runtime/build tooling: SQL migrations (Flyway, Liquibase, Alembic, Prisma, Drizzle, Goose, sqitch, or raw SQL) and application query layers.
 - Framework modules covered: relational schema design, DDL migrations, indexing, query plans, transactions/locking, and role/permission boundaries.
-- Out-of-scope / unsupported versions: EOL PostgreSQL (< 13) without explicit legacy support requirements; non-PostgreSQL engines and application-specific ORM mapping idioms (load the application framework skill separately).
+- Out-of-scope / unsupported versions: EOL PostgreSQL (< 14) without explicit legacy support requirements; non-PostgreSQL engines and application-specific ORM mapping idioms (load the application framework skill separately).
 
 ## When to load
 

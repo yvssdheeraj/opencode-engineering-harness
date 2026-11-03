@@ -5,21 +5,6 @@ permissions:
   - action: edit
     resource: "*"
     effect: allow
-  - action: shell
-    resource: "*"
-    effect: ask
-  - action: shell
-    resource: "git status *"
-    effect: allow
-  - action: shell
-    resource: "git diff *"
-    effect: allow
-  - action: shell
-    resource: "git log *"
-    effect: allow
-  - action: shell
-    resource: "git show *"
-    effect: allow
   - action: subagent
     resource: "*"
     effect: deny

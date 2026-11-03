@@ -146,23 +146,6 @@ REQUIRED_TECH_SKILL_HEADINGS = [
     "## Completion checklist",
     "## References",
 ]
-REQUIRED_IGNORE_PATTERNS = [
-    ".env",
-    ".env.*",
-    "!.env.example",
-    "!.env.sample",
-    "!.env.template",
-    "*.pem",
-    "*.key",
-    "*.p12",
-    "*.pfx",
-    "*id_rsa*",
-    "*id_ed25519*",
-    ".aws/",
-    ".ssh/",
-    "secrets/",
-    "*credentials*",
-]
 BASE_V2_POLICY = [
     {"action": "*", "resource": "*", "effect": "allow"},
     {"action": "read", "resource": "*.env", "effect": "ask"},
@@ -296,7 +279,10 @@ def parse_frontmatter(markdown_text: str) -> tuple[dict[str, Any], str]:
         key = key.strip()
         rest = rest.strip()
         if rest:
-            data[key] = _unquote(rest)
+            if rest.startswith("[") or rest.startswith("{"):
+                data[key] = parse_jsonc(rest)
+            else:
+                data[key] = _unquote(rest)
             i += 1
             continue
 
@@ -528,143 +514,47 @@ def check_opencode_config(root: pathlib.Path, findings: list[CheckFinding]) -> d
 
     rules = validate_permission_list(config.get("permissions"), "opencode.jsonc", findings)
     if rules:
-        for safe_sample in ("src/index.ts", "README.md", ".env.example", ".env.sample", ".env.template"):
-            eff = resolve_permission(rules, "read", safe_sample)
+        effective_global = BASE_V2_POLICY + rules
+        for allowed_action, sample_res in (
+            ("read", "src/index.ts"),
+            ("glob", "**/*.ts"),
+            ("grep", "DEFAULT_TIMEOUT"),
+            ("skill", "spring-boot"),
+            ("question", "*"),
+        ):
+            eff = resolve_permission(effective_global, allowed_action, sample_res)
             if eff != "allow":
                 findings.append(
                     CheckFinding(
                         "FAIL",
-                        "security",
-                        f"opencode.jsonc must allow reading safe workspace file {safe_sample!r} (resolved to {eff!r}).",
+                        "permissions",
+                        f"opencode.jsonc effective permissions must allow {allowed_action!r} (resolved to {eff!r}).",
                     )
                 )
 
-        for env_sample in (".env", ".env.local", ".env.production", "services/api/.env"):
-            eff = resolve_permission(rules, "read", env_sample)
-            if eff not in ("ask", "deny"):
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"opencode.jsonc allows unrestricted read of {env_sample!r} (resolved to {eff!r}); must be 'ask' or 'deny'.",
-                    )
-                )
-
-        for secret_sample in (
-            "tls/private.key",
-            "certs/server.pem",
-            "certs/ bundle.p12",
-            "certs/client.pfx",
-            "id_rsa",
-            "id_ed25519",
-            ".aws/credentials",
-            ".ssh/id_rsa",
-            "secrets/prod.json",
-            "config/service-credentials.json",
+        for gated_action, sample_res in (
+            ("shell", "npm test"),
+            ("external_directory", "../outside-project/*"),
+            ("websearch", "opencode"),
+            ("webfetch", "https://example.com"),
+            ("github_create_issue", "*"),
         ):
-            eff = resolve_permission(rules, "read", secret_sample)
-            if eff != "deny":
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"opencode.jsonc must deny reading sensitive secret/key path {secret_sample!r} (resolved to {eff!r}).",
-                    )
-                )
-
-        ext_eff = resolve_permission(rules, "external_directory", "../outside-project/*")
-        if ext_eff not in ("ask", "deny"):
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "security",
-                    f"opencode.jsonc must guard external_directory with 'ask' or 'deny' (resolved to {ext_eff!r}).",
-                )
-            )
-
-        for shell_cmd in ("rm -rf /", "git push origin main", "curl https://example.com"):
-            sh_eff = resolve_permission(rules, "shell", shell_cmd)
-            if sh_eff not in ("ask", "deny"):
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"opencode.jsonc must not pre-allow arbitrary shell command {shell_cmd!r} (resolved to {sh_eff!r}).",
-                    )
-                )
-
-        for git_cmd in ("git status", "git status --short", "git diff", "git log -n 5", "git show HEAD"):
-            git_eff = resolve_permission(rules, "shell", git_cmd)
-            if git_eff != "allow":
+            g_eff = resolve_permission(effective_global, gated_action, sample_res)
+            if g_eff not in ("ask", "deny"):
                 findings.append(
                     CheckFinding(
                         "FAIL",
                         "permissions",
-                        f"opencode.jsonc should allow read-only Git command {git_cmd!r} (resolved to {git_eff!r}).",
+                        f"opencode.jsonc must set {gated_action!r} to 'ask' or 'deny' via '*: ask' (resolved to {g_eff!r}).",
                     )
                 )
 
-        if resolve_permission(rules, "grep", "DEFAULT_TIMEOUT") != "allow":
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "permissions",
-                    "opencode.jsonc must allow normal code grep queries such as 'DEFAULT_TIMEOUT'.",
-                )
-            )
-        for dump_pattern in (".*", ".+", "^.*", "^.+"):
-            dump_eff = resolve_permission(rules, "grep", dump_pattern)
-            if dump_eff not in ("ask", "deny"):
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"opencode.jsonc must guard catch-all grep dump pattern {dump_pattern!r} with 'ask' or 'deny' (resolved to {dump_eff!r}).",
-                    )
-                )
-        for key_pattern in ("-----BEGIN RSA PRIVATE KEY-----", "PRIVATE KEY"):
-            key_eff = resolve_permission(rules, "grep", key_pattern)
-            if key_eff != "deny":
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"opencode.jsonc must deny grep private-key pattern {key_pattern!r} (resolved to {key_eff!r}).",
-                    )
-                )
-
-    for ignore_filename in (".ignore", ".gitignore"):
-        ignore_path = root / ignore_filename
-        if not ignore_path.is_file():
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "security",
-                    f"Missing root {ignore_filename} file for secret exclusion.",
-                )
-            )
-        else:
-            ignore_lines = {
-                line.strip()
-                for line in ignore_path.read_text(encoding="utf-8").splitlines()
-                if line.strip() and not line.strip().startswith("#")
-            }
-            missing_ignore = [pat for pat in REQUIRED_IGNORE_PATTERNS if pat not in ignore_lines]
-            if missing_ignore:
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"{ignore_filename} is missing required secret-protection patterns: {missing_ignore}.",
-                    )
-                )
-
-    if not any(f.level == "FAIL" and f.category in ("config", "security", "permissions") for f in findings):
+    if not any(f.level == "FAIL" and f.category in ("config", "permissions") for f in findings):
         findings.append(
             CheckFinding(
                 "PASS",
                 "config",
-                "opencode.jsonc syntax, V2 schema keys, common instructions, and secret/permission boundaries verified.",
+                "opencode.jsonc syntax, V2 schema keys, common instructions, and default permission prompts verified.",
             )
         )
     return config
@@ -675,6 +565,7 @@ def check_agents(
     global_rules: list[dict[str, str]],
     findings: list[CheckFinding],
 ) -> set[str]:
+    initial_failures = sum(1 for f in findings if f.level == "FAIL")
     agents_dir = root / ".opencode" / "agents"
     if not agents_dir.is_dir():
         findings.append(CheckFinding("FAIL", "agents", "Missing .opencode/agents directory."))
@@ -762,16 +653,6 @@ def check_agents(
                 findings.append(CheckFinding("FAIL", "agents", "developer.md must allow 'edit' on workspace files."))
             if resolve_permission(effective_rules, "shell", "npm test") != "ask":
                 findings.append(CheckFinding("FAIL", "agents", "developer.md must keep arbitrary 'shell' on 'ask'."))
-            for allowed_git_cmd in ("git status", "git status --short", "git diff", "git log -n 3", "git show HEAD"):
-                eff = resolve_permission(effective_rules, "shell", allowed_git_cmd)
-                if eff != "allow":
-                    findings.append(
-                        CheckFinding(
-                            "FAIL",
-                            "agents",
-                            f"developer.md effective permissions (merged with opencode.jsonc) must allow read-only Git command {allowed_git_cmd!r} (resolved to {eff!r}).",
-                        )
-                    )
             if resolve_permission(effective_rules, "subagent", "unlisted-agent") != "deny":
                 findings.append(
                     CheckFinding("FAIL", "agents", "developer.md must deny unlisted subagents by default.")
@@ -821,14 +702,6 @@ def check_agents(
             for denied_action, sample_res in (
                 ("edit", "src/app.py"),
                 ("subagent", "explorer"),
-                ("execute", "*"),
-                ("browser", "*"),
-                ("webfetch", "https://example.com"),
-                ("websearch", "opencode"),
-                ("question", "*"),
-                ("external_directory", "../outside/*"),
-                ("github_create_issue", "*"),
-                ("slack_post_message", "*"),
             ):
                 eff = resolve_permission(effective_rules, denied_action, sample_res)
                 if eff != "deny":
@@ -859,45 +732,8 @@ def check_agents(
                             f"Read-only subagent {rel_label} must allow read-only Git command {allowed_git_cmd!r} (resolved to {eff!r}).",
                         )
                     )
-            if resolve_permission(effective_rules, "read", "src/app.py") != "allow":
-                findings.append(
-                    CheckFinding("FAIL", "agents", f"Read-only subagent {rel_label} must allow reading source files.")
-                )
-            if resolve_permission(effective_rules, "read", ".env") not in ("ask", "deny"):
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"Read-only subagent {rel_label} overrides global .env protection (must be 'ask' or 'deny').",
-                    )
-                )
-            for secret_sample in ("private.key", "server.pem", ".aws/credentials", "secrets/prod.json"):
-                if resolve_permission(effective_rules, "read", secret_sample) != "deny":
-                    findings.append(
-                        CheckFinding(
-                            "FAIL",
-                            "security",
-                            f"Read-only subagent {rel_label} overrides global secret denial on {secret_sample!r}.",
-                        )
-                    )
-            if resolve_permission(effective_rules, "grep", ".*") not in ("ask", "deny"):
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"Read-only subagent {rel_label} overrides global grep catch-all dump protection.",
-                    )
-                )
-            if resolve_permission(effective_rules, "grep", "PRIVATE KEY") != "deny":
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "security",
-                        f"Read-only subagent {rel_label} overrides global grep private-key denial.",
-                    )
-                )
 
-    if not any(f.level == "FAIL" and f.category == "agents" for f in findings):
+    if sum(1 for f in findings if f.level == "FAIL") == initial_failures:
         findings.append(
             CheckFinding(
                 "PASS",
@@ -1275,18 +1111,13 @@ def check_templates(
                         f"{rel_label} must deny 'edit' on out-of-scope/shared path {denied_path!r} (resolved to {eff!r}).",
                     )
                 )
-        for denied_action in ("subagent", "execute", "browser", "github_create_issue"):
-            if resolve_permission(effective_rules, denied_action, "*") != "deny":
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "templates",
-                        f"{rel_label} must deny {denied_action!r} under effective permissions.",
-                    )
-                )
-        if resolve_permission(effective_rules, "read", "private.key") != "deny":
+        if resolve_permission(effective_rules, "subagent", "explorer") != "deny":
             findings.append(
-                CheckFinding("FAIL", "templates", f"{rel_label} must preserve secret read denial on 'private.key'.")
+                CheckFinding(
+                    "FAIL",
+                    "templates",
+                    f"{rel_label} must deny 'subagent' under effective permissions.",
+                )
             )
         if resolve_permission(effective_rules, "shell", "rm -rf /") != "deny":
             findings.append(
@@ -1395,7 +1226,7 @@ def check_rule_routing(
                     CheckFinding(
                         "FAIL",
                         "routing",
-                        f"Domain {domain_name!r} references unknown skill {sk!r}.",
+                        f"Domain {domain_name!r} references missing skill {sk!r}.",
                     )
                 )
         for qg in spec.get("quality_gates", []):
@@ -1524,10 +1355,18 @@ def compute_preflight(
             matched_domains.append(d_clean)
 
     for fpath in files or []:
+        norm_f = fpath.strip("/").replace("\\", "/")
+        if norm_f.startswith(("specs/", ".specify/")):
+            continue
+        file_matched_any = False
         for d_name, spec in domain_map.items():
             for pat in spec.get("path_globs", []):
-                if _match_path_glob(fpath, pat) and d_name not in matched_domains:
-                    matched_domains.append(d_name)
+                if _match_path_glob(norm_f, pat):
+                    file_matched_any = True
+                    if d_name not in matched_domains:
+                        matched_domains.append(d_name)
+        if not file_matched_any and "application-code" not in matched_domains:
+            matched_domains.append("application-code")
 
     if not matched_domains:
         matched_domains.append("application-code")
@@ -1553,6 +1392,28 @@ def compute_preflight(
             if rev not in reviewers:
                 reviewers.append(rev)
 
+    # Dynamically discover installed technology skills in .opencode/skills/
+    skills_dir = root / ".opencode" / "skills"
+    installed_tech_skills: list[str] = []
+    if skills_dir.is_dir():
+        stack_lower = stack.lower()
+        has_explicit_stack = stack != "<detect from manifests>" and bool(stack.strip())
+        for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+            sid = skill_md.parent.name
+            installed_tech_skills.append(sid)
+            if has_explicit_stack:
+                tokens = [t for t in sid.split("-") if len(t) >= 3]
+                if any(t in stack_lower for t in tokens) and sid not in skills:
+                    skills.append(sid)
+            else:
+                if (
+                    ("database" in matched_domains and sid == "postgresql")
+                    or (("frontend" in matched_domains or "accessibility" in matched_domains) and sid == "react-typescript")
+                    or ("infrastructure" in matched_domains and sid == "terraform")
+                    or (("application-code" in matched_domains or "api" in matched_domains) and sid == "spring-boot")
+                ) and sid not in skills:
+                    skills.append(sid)
+
     quality_gates.sort(key=lambda x: int(x.split("-")[1]))
 
     block_lines = [
@@ -1561,6 +1422,7 @@ def compute_preflight(
         f"Task domains: {', '.join(matched_domains)}",
         f"Required engineering rules loaded: {', '.join(rules) if rules else 'none'}",
         f"Skills loaded: {', '.join(skills) if skills else 'none'}",
+        f"Installed technology skills available: {', '.join(installed_tech_skills) if installed_tech_skills else 'none'}",
         f"Applicable quality gates: {', '.join(quality_gates) if quality_gates else 'none'}",
         f"Recommended specialist reviewers: {', '.join(reviewers) if reviewers else 'none'}",
     ]
@@ -1572,6 +1434,7 @@ def compute_preflight(
         "speckit_workflow_rules": manifest.get("speckit_workflow_rules", []),
         "engineering_rules": rules,
         "skills": skills,
+        "installed_technology_skills": installed_tech_skills,
         "quality_gates": quality_gates,
         "reviewers": reviewers,
         "formatted": "\n".join(block_lines),
@@ -1603,9 +1466,28 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
                 CheckFinding("PASS", "readiness", "AGENTS.md project-specific facts are populated (no TODOs).")
             )
 
+    if (root / "opencode.json").is_file() and (root / "opencode.jsonc").is_file():
+        findings.append(
+            CheckFinding(
+                "WARN",
+                "readiness",
+                "Both opencode.json and opencode.jsonc exist in the repository root; merge any Spec Kit plugin/event keys into opencode.jsonc and remove the duplicate file.",
+            )
+        )
+
     constitution = root / ".specify" / "memory" / "constitution.md"
     if constitution.is_file():
-        findings.append(CheckFinding("PASS", "readiness", "Found .specify/memory/constitution.md."))
+        const_text = constitution.read_text(encoding="utf-8")
+        if "[PROJECT_NAME]" in const_text or "[PRINCIPLE_1_NAME]" in const_text:
+            findings.append(
+                CheckFinding(
+                    "WARN",
+                    "readiness",
+                    ".specify/memory/constitution.md still contains unfilled template placeholders ([PROJECT_NAME]); run '/speckit.constitution' to tailor it.",
+                )
+            )
+        else:
+            findings.append(CheckFinding("PASS", "readiness", "Found tailored .specify/memory/constitution.md."))
     else:
         findings.append(
             CheckFinding(

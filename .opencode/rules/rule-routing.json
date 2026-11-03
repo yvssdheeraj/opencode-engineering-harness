@@ -18,7 +18,6 @@
         "engineering/testing.md",
         "engineering/architecture.md"
       ],
-      "skills": ["software-engineering", "tdd"],
       "quality_gates": ["QG-01", "QG-03", "QG-04", "QG-05", "QG-06", "QG-14", "QG-17"],
       "reviewers": ["code-reviewer"]
     },
@@ -30,7 +29,6 @@
         "engineering/coding-standards.md",
         "engineering/cross-cutting-practices.md"
       ],
-      "skills": ["software-engineering"],
       "quality_gates": ["QG-02", "QG-03", "QG-13", "QG-15"],
       "reviewers": ["architecture-reviewer", "code-reviewer"]
     },
@@ -43,7 +41,6 @@
         "engineering/security.md",
         "engineering/observability.md"
       ],
-      "skills": ["api-design", "tdd"],
       "quality_gates": ["QG-01", "QG-04", "QG-07", "QG-11", "QG-13", "QG-15"],
       "reviewers": ["code-reviewer", "security-reviewer"]
     },
@@ -53,7 +50,6 @@
       "rules": [
         "engineering/security.md"
       ],
-      "skills": ["security-review"],
       "quality_gates": ["QG-04", "QG-07", "QG-15"],
       "reviewers": ["security-reviewer", "code-reviewer"]
     },
@@ -66,7 +62,6 @@
         "engineering/reliability.md",
         "engineering/security.md"
       ],
-      "skills": ["database-engineering", "postgresql"],
       "quality_gates": ["QG-04", "QG-07", "QG-08", "QG-15"],
       "reviewers": ["code-reviewer", "test-reviewer"]
     },
@@ -79,7 +74,6 @@
         "engineering/testing.md",
         "engineering/security.md"
       ],
-      "skills": ["react-typescript", "tdd"],
       "quality_gates": ["QG-04", "QG-05", "QG-07", "QG-12", "QG-15"],
       "reviewers": ["code-reviewer", "test-reviewer"]
     },
@@ -91,7 +85,6 @@
         "engineering/observability.md",
         "engineering/reliability.md"
       ],
-      "skills": ["software-engineering"],
       "quality_gates": ["QG-04", "QG-11", "QG-15"],
       "reviewers": ["code-reviewer", "architecture-reviewer"]
     },
@@ -104,7 +97,6 @@
         "engineering/observability.md",
         "engineering/testing.md"
       ],
-      "skills": ["software-engineering", "tdd"],
       "quality_gates": ["QG-04", "QG-11", "QG-15"],
       "reviewers": ["code-reviewer", "test-reviewer"]
     },
@@ -117,7 +109,6 @@
         "engineering/reliability.md",
         "engineering/observability.md"
       ],
-      "skills": ["terraform", "security-review"],
       "quality_gates": ["QG-07", "QG-09", "QG-10", "QG-11", "QG-15"],
       "reviewers": ["infra-reviewer", "security-reviewer"]
     },
@@ -130,7 +121,6 @@
         "engineering/infrastructure.md",
         "engineering/observability.md"
       ],
-      "skills": ["security-review"],
       "quality_gates": ["QG-05", "QG-06", "QG-07", "QG-10", "QG-15"],
       "reviewers": ["infra-reviewer", "security-reviewer"]
     },
@@ -142,7 +132,6 @@
         "engineering/reliability.md",
         "engineering/security.md"
       ],
-      "skills": ["software-engineering"],
       "quality_gates": ["QG-07", "QG-11", "QG-15"],
       "reviewers": ["code-reviewer"]
     },
@@ -153,18 +142,16 @@
         "engineering/accessibility-and-ux.md",
         "engineering/frontend.md"
       ],
-      "skills": ["react-typescript"],
       "quality_gates": ["QG-01", "QG-04", "QG-12", "QG-15"],
       "reviewers": ["code-reviewer", "test-reviewer"]
     },
     "documentation": {
       "description": "READMEs, architecture docs, ADRs, API docs, or operational runbooks",
-      "path_globs": ["README.md", "AGENTS.md", "docs/**", "**/*.md"],
+      "path_globs": ["README.md", "AGENTS.md", "docs/**"],
       "rules": [
         "engineering/documentation.md",
         "engineering/architecture.md"
       ],
-      "skills": [],
       "quality_gates": ["QG-01", "QG-13", "QG-14", "QG-17"],
       "reviewers": ["code-reviewer"]
     },
@@ -174,7 +161,6 @@
       "rules": [
         "engineering/git-and-review.md"
       ],
-      "skills": [],
       "quality_gates": ["QG-14", "QG-15", "QG-17"],
       "reviewers": ["code-reviewer"]
     },
@@ -185,7 +171,6 @@
         "engineering/cross-cutting-practices.md",
         "engineering/architecture.md"
       ],
-      "skills": ["software-engineering", "bdd-gherkin"],
       "quality_gates": ["QG-02", "QG-04", "QG-15"],
       "reviewers": ["architecture-reviewer", "code-reviewer"]
     }

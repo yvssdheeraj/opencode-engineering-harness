@@ -1,9 +1,9 @@
 # Adding and Managing Skills (`skills.sh` + Custom Skills)
 
-This blueprint separates skills into two categories:
+In this harness:
 
-1. **Core methodology skills (included in this repo):** Stack-neutral workflows (`software-engineering`, `tdd`, `bdd-gherkin`, `api-design`, `database-engineering`, `security-review`) that integrate directly with the `.opencode/rules/` standards.
-2. **Technology/framework skills (sourced from [skills.sh](https://skills.sh) or custom-authored):** Stack-specific playbooks (`react-typescript`, `spring-boot`, `postgresql`, `terraform`, Next.js, FastAPI, Go, etc.) tailored to the target repository.
+1. **Stack-neutral engineering standards live in `.opencode/rules/`** (architecture, clean code, TDD/BDD testing, API design, database management, security, reliability, observability, CI/CD, and infrastructure), while **specialist roles live in `.opencode/agents/`** (`developer`, `explorer`, and `*-reviewer`).
+2. **Technology and framework playbooks live in `.opencode/skills/`** (sourced from [skills.sh](https://skills.sh) or custom-authored using `docs/templates/technology-skill-template.md`), such as `react-typescript`, `spring-boot`, `postgresql`, `terraform`, Next.js, FastAPI, Go, etc.
 
 ## Installing community skills from `skills.sh`
 
@@ -36,13 +36,13 @@ Community skills are written by external authors for generic environments. Befor
 
 ## Example skill selection
 
-| Task | Candidate skills |
-|---|---|
-| Spring Boot endpoint with persistence | `api-design`, `tdd`, `spring-boot`, `postgresql` if PostgreSQL is the actual datastore, `security-review` for auth/data exposure |
-| React form | `react-typescript`, `tdd`, `bdd-gherkin` only if business scenarios warrant it |
-| Terraform network module | `terraform`, plus infrastructure and security rules |
-| PostgreSQL migration | `postgresql`, `database-engineering` |
-| CI pipeline | Add/load a skill for the actual CI provider; read CI/CD and security rules |
+| Task | Technology skills to load | Engineering rules to read |
+|---|---|---|
+| Spring Boot endpoint with PostgreSQL | `spring-boot`, `postgresql` | `engineering/api-and-integration.md`, `engineering/testing.md`, `engineering/data-management.md`, `engineering/security.md` |
+| React form | `react-typescript` | `engineering/frontend.md`, `engineering/accessibility-and-ux.md`, `engineering/testing.md` |
+| Terraform network module | `terraform` | `engineering/infrastructure.md`, `engineering/security.md`, `engineering/reliability.md` |
+| PostgreSQL migration | `postgresql` | `engineering/data-management.md`, `engineering/reliability.md`, `engineering/performance.md` |
+| CI pipeline | CI provider skill (if installed) | `engineering/cicd.md`, `engineering/security.md`, `engineering/infrastructure.md` |
 
 ## Example: add a language/framework skill
 

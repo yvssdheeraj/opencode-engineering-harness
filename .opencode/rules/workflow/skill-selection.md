@@ -20,11 +20,10 @@ Load a skill only when the technology/domain is present in the affected work and
 
 Examples:
 
-- Spring Boot REST endpoint: `software-engineering`, `tdd`, `api-design`, `spring-boot`; add database/security skills only if those boundaries are changed.
-- React form: `tdd`, `react-typescript`; apply frontend and accessibility rules. Do not load Terraform.
-- Terraform module: `terraform` and infrastructure/security rules; do not load frontend skills.
-- Database migration: `database-engineering` (plus the relevant DBMS skill such as `postgresql`) and data-management/reliability rules; load application framework guidance only if runtime compatibility is affected.
-- Business workflow with shared executable acceptance examples: `bdd-gherkin`; do not use it to duplicate every unit test.
+- Spring Boot REST endpoint with PostgreSQL: load `spring-boot` and `postgresql` skills; apply `engineering/api-and-integration.md`, `engineering/testing.md`, and `engineering/data-management.md` rules.
+- React form: load `react-typescript` skill; apply `engineering/frontend.md`, `engineering/accessibility-and-ux.md`, and `engineering/testing.md` rules. Do not load `terraform`.
+- Terraform module: load `terraform` skill; apply `engineering/infrastructure.md` and `engineering/security.md` rules. Do not load frontend skills.
+- PostgreSQL migration: load `postgresql` skill; apply `engineering/data-management.md` and `engineering/reliability.md` rules; load application framework skills only if runtime compatibility is affected.
 
 ## Loading, authority, and third-party skills (`skills.sh`)
 

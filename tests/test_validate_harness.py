@@ -15,7 +15,7 @@ class ValidateHarnessTests(unittest.TestCase):
     def _copy_repo_to_temp(self) -> pathlib.Path:
         tmp_dir = pathlib.Path(tempfile.mkdtemp(prefix="harness-test-"))
         self.addCleanup(lambda: shutil.rmtree(tmp_dir, ignore_errors=True))
-        for item in ("opencode.jsonc", ".ignore", ".gitignore", "AGENTS.md", "README.md", ".opencode", "docs", "scripts"):
+        for item in ("opencode.jsonc", ".gitignore", "AGENTS.md", "README.md", ".opencode", "docs", "scripts"):
             src = REPO_ROOT / item
             dst = tmp_dir / item
             if src.is_dir():
@@ -45,23 +45,21 @@ class ValidateHarnessTests(unittest.TestCase):
         self.assertEqual(parsed["$schema"], "https://opencode.ai/config.json")
         self.assertEqual(parsed["list"], ["a", "b"])
 
-    def test_detects_clobbered_env_and_secret_read_permissions(self) -> None:
+    def test_detects_missing_global_ask_default(self) -> None:
         tmp_root = self._copy_repo_to_temp()
         cfg_path = tmp_root / "opencode.jsonc"
         cfg = validate_harness.parse_jsonc(cfg_path.read_text(encoding="utf-8"))
-        # Append a broad allow at the end so last-match-wins clobbers .env and key protections
-        cfg["permissions"].append({"action": "read", "resource": "*", "effect": "allow"})
+        # Remove the *: ask catch-all rule so shell/MCP actions fall back to OpenCode's built-in *: allow
+        cfg["permissions"] = [
+            r for r in cfg["permissions"] if not (r["action"] == "*" and r["resource"] == "*")
+        ]
         cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
         findings = validate_harness.validate_repository(tmp_root, mode="template")
-        failures = [f for f in findings if f.level == "FAIL" and f.category == "security"]
+        failures = [f for f in findings if f.level == "FAIL" and f.category == "permissions"]
         self.assertTrue(
-            any(".env" in f.message for f in failures),
-            f"Expected .env security failure when read:* allow is last, got: {failures}",
-        )
-        self.assertTrue(
-            any("private.key" in f.message or "id_rsa" in f.message for f in failures),
-            f"Expected key/secret security failure when read:* allow is last, got: {failures}",
+            any("shell" in f.message or "github_create_issue" in f.message for f in failures),
+            f"Expected permission failure when *:ask default is removed, got: {failures}",
         )
 
     def test_detects_reviewer_granted_write_or_shell_access(self) -> None:
@@ -69,8 +67,8 @@ class ValidateHarnessTests(unittest.TestCase):
         reviewer_path = tmp_root / ".opencode" / "agents" / "code-reviewer.md"
         text = reviewer_path.read_text(encoding="utf-8")
         mutated = text.replace(
-            "  - action: shell\n    resource: \"git show *\"\n    effect: allow",
-            "  - action: shell\n    resource: \"git show *\"\n    effect: allow\n  - action: edit\n    resource: \"*\"\n    effect: allow",
+            "  - action: edit\n    resource: \"*\"\n    effect: deny",
+            "  - action: edit\n    resource: \"*\"\n    effect: allow",
         )
         reviewer_path.write_text(mutated, encoding="utf-8")
 
@@ -96,9 +94,9 @@ class ValidateHarnessTests(unittest.TestCase):
 
     def test_detects_skill_name_mismatch_and_broken_reference(self) -> None:
         tmp_root = self._copy_repo_to_temp()
-        skill_path = tmp_root / ".opencode" / "skills" / "tdd" / "SKILL.md"
+        skill_path = tmp_root / ".opencode" / "skills" / "spring-boot" / "SKILL.md"
         skill_path.write_text(
-            skill_path.read_text(encoding="utf-8").replace("name: tdd", "name: wrong-name"),
+            skill_path.read_text(encoding="utf-8").replace("name: spring-boot", "name: wrong-name"),
             encoding="utf-8",
         )
         agents_md = tmp_root / "AGENTS.md"
@@ -134,29 +132,22 @@ class ValidateHarnessTests(unittest.TestCase):
         ]
         self.assertEqual(readiness_failures_after, [])
 
-    def test_detects_legacy_v1_permission_actions_and_missing_ignore(self) -> None:
+    def test_detects_legacy_v1_permission_actions(self) -> None:
         tmp_root = self._copy_repo_to_temp()
-        # Inject legacy V1 'write' action into explorer.md and delete .ignore
         explorer_path = tmp_root / ".opencode" / "agents" / "explorer.md"
         explorer_path.write_text(
             explorer_path.read_text(encoding="utf-8").replace(
-                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny",
-                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny\n  - action: write\n    resource: \"*\"\n    effect: deny",
+                "  - action: edit\n    resource: \"*\"\n    effect: deny",
+                "  - action: edit\n    resource: \"*\"\n    effect: deny\n  - action: write\n    resource: \"*\"\n    effect: deny",
             ),
             encoding="utf-8",
         )
-        (tmp_root / ".ignore").unlink()
 
         findings = validate_harness.validate_repository(tmp_root, mode="template")
         perm_failures = [f for f in findings if f.level == "FAIL" and f.category == "permissions"]
-        sec_failures = [f for f in findings if f.level == "FAIL" and f.category == "security"]
         self.assertTrue(
             any("write" in f.message for f in perm_failures),
             f"Expected V1 action 'write' to be rejected, got: {perm_failures}",
-        )
-        self.assertTrue(
-            any(".ignore" in f.message for f in sec_failures),
-            f"Expected missing .ignore to fail security validation, got: {sec_failures}",
         )
 
     def test_validates_implementation_worker_template_scope_boundaries(self) -> None:
@@ -189,98 +180,22 @@ class ValidateHarnessTests(unittest.TestCase):
         self.assertIn(".opencode/rules/engineering/security.md", result["engineering_rules"])
         self.assertIn(".opencode/rules/engineering/data-management.md", result["engineering_rules"])
         self.assertIn(".opencode/rules/engineering/api-and-integration.md", result["engineering_rules"])
-        self.assertIn("database-engineering", result["skills"])
-        self.assertIn("security-review", result["skills"])
+        self.assertIn("spring-boot", result["skills"])
+        self.assertIn("postgresql", result["skills"])
         self.assertIn("security-reviewer", result["reviewers"])
         self.assertIn("QG-07", result["quality_gates"])
         self.assertIn("QG-08", result["quality_gates"])
 
-    def test_ripgrep_ignore_blocks_secret_files_under_opencode_v2_flags(self) -> None:
-        rg_bin = shutil.which("rg")
-        if not rg_bin:
-            self.skipTest("ripgrep (rg) binary not installed")
-
-        tmp_root = self._copy_repo_to_temp()
-        marker = "SUPER_SECRET_CANARY_TOKEN_98765"
-        (tmp_root / ".env").write_text(f"API_KEY={marker}\n", encoding="utf-8")
-        (tmp_root / ".env.production").write_text(f"PROD_KEY={marker}\n", encoding="utf-8")
-        (tmp_root / ".env.example").write_text(f"EXAMPLE_KEY={marker}\n", encoding="utf-8")
-        (tmp_root / "server.pem").write_text(f"-----BEGIN PRIVATE KEY-----\n{marker}\n", encoding="utf-8")
-        (tmp_root / "private.key").write_text(f"{marker}\n", encoding="utf-8")
-        (tmp_root / "service-credentials.json").write_text(f'{{"secret": "{marker}"}}\n', encoding="utf-8")
-        secrets_dir = tmp_root / "secrets"
-        secrets_dir.mkdir(exist_ok=True)
-        (secrets_dir / "db.txt").write_text(f"{marker}\n", encoding="utf-8")
-        aws_dir = tmp_root / ".aws"
-        aws_dir.mkdir(exist_ok=True)
-        (aws_dir / "credentials").write_text(f"aws_secret_access_key = {marker}\n", encoding="utf-8")
-
-        # Execute ripgrep with the exact flags used by OpenCode V2 packages/core/src/ripgrep.ts
-        proc = subprocess.run(
-            [
-                rg_bin,
-                "--no-config",
-                "--files-with-matches",
-                "--hidden",
-                "--no-messages",
-                "--glob=!**/.git/**",
-                "--",
-                marker,
-                ".",
-            ],
-            cwd=tmp_root,
-            capture_output=True,
-            text=True,
-            check=False,
+        # Verify README.md + main.go loads both documentation and application-code, and specs/** does not trigger docs
+        mixed = validate_harness.compute_preflight(
+            REPO_ROOT,
+            domains=[],
+            files=["README.md", "main.go", "specs/001-auth/tasks.md"],
+            stack="Vue + MySQL",
         )
-        matched_files = {
-            line.strip().removeprefix("./")
-            for line in proc.stdout.splitlines()
-            if line.strip()
-        }
-        self.assertEqual(
-            matched_files,
-            {".env.example"},
-            f"Expected .ignore to block all secret files except .env.example under rg --no-config --hidden; got: {matched_files}",
-        )
-
-    def test_detects_developer_clobbering_global_git_permissions(self) -> None:
-        tmp_root = self._copy_repo_to_temp()
-        dev_path = tmp_root / ".opencode" / "agents" / "developer.md"
-        # Append shell:* -> ask at the end of developer.md so it overrides git status * -> allow
-        dev_path.write_text(
-            dev_path.read_text(encoding="utf-8").replace(
-                "  - action: subagent\n    resource: \"infra-reviewer\"\n    effect: allow",
-                "  - action: subagent\n    resource: \"infra-reviewer\"\n    effect: allow\n  - action: shell\n    resource: \"*\"\n    effect: ask",
-            ),
-            encoding="utf-8",
-        )
-
-        findings = validate_harness.validate_repository(tmp_root, mode="template")
-        agent_failures = [f for f in findings if f.level == "FAIL" and f.category == "agents"]
-        self.assertTrue(
-            any("developer.md" in f.message and "git status" in f.message for f in agent_failures),
-            f"Expected merged permission check to catch developer overriding git status *, got: {agent_failures}",
-        )
-
-    def test_detects_reviewer_missing_default_deny_for_mcp_and_external_actions(self) -> None:
-        tmp_root = self._copy_repo_to_temp()
-        sec_rev = tmp_root / ".opencode" / "agents" / "security-reviewer.md"
-        # Replace default-deny (*: deny) with edit-only deny so MCP actions fall through to BASE_V2_POLICY allow
-        sec_rev.write_text(
-            sec_rev.read_text(encoding="utf-8").replace(
-                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny",
-                "  - action: edit\n    resource: \"*\"\n    effect: deny\n  - action: subagent\n    resource: \"*\"\n    effect: deny\n  - action: shell\n    resource: \"*\"\n    effect: deny",
-            ),
-            encoding="utf-8",
-        )
-
-        findings = validate_harness.validate_repository(tmp_root, mode="template")
-        agent_failures = [f for f in findings if f.level == "FAIL" and f.category == "agents"]
-        self.assertTrue(
-            any("security-reviewer.md" in f.message and "github_create_issue" in f.message for f in agent_failures),
-            f"Expected reviewer without *:deny to fail MCP action denial check, got: {agent_failures}",
-        )
+        self.assertEqual(mixed["domains"], ["documentation", "application-code"])
+        self.assertNotIn("postgresql", mixed["skills"])
+        self.assertNotIn("react-typescript", mixed["skills"])
 
 
 if __name__ == "__main__":

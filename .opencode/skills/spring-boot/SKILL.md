@@ -7,7 +7,7 @@ description: Use when modifying a Java application that actually uses Spring Boo
 
 ## Supported scope
 
-- Technology and version range: Spring Boot 2.7.x and 3.x+ on Java 17/21+ (inspect `pom.xml` or `build.gradle(.kts)` to confirm exact Spring Boot, Java, and `javax.*` vs `jakarta.*` namespace versions).
+- Technology and version range: Spring Boot 2.7.x, 3.x, and 4.x+ on Java 17/21+ (inspect `pom.xml` or `build.gradle(.kts)` to confirm exact Spring Boot, Java, and `javax.*` vs `jakarta.*` namespace versions).
 - Last reviewed: 2026-11
 - Runtime/build tooling: Maven (`./mvnw`) and Gradle (`./gradlew`).
 - Framework modules covered: Spring Web/MVC, Spring Validation, Spring Security, Spring Data JPA/JDBC, Spring Boot Actuator, and `@ConfigurationProperties`.

@@ -33,7 +33,7 @@ Then read the applicable domain rules. `.opencode/rules/rule-routing.json` is th
 | Any application code | `engineering/coding-standards.md`, `engineering/testing.md`, `engineering/architecture.md` as appropriate |
 | Architecture, module boundaries, refactoring | `engineering/architecture.md`, `engineering/coding-standards.md`, `engineering/cross-cutting-practices.md` |
 | API, services, events, messaging | `engineering/api-and-integration.md`, `engineering/reliability.md`, `engineering/security.md`, `engineering/observability.md` as relevant |
-| Authentication, authorization, PII, secrets, trust boundaries | `engineering/security.md`; select `security-review` skill |
+| Authentication, authorization, PII, secrets, trust boundaries | `engineering/security.md`; delegate to `security-reviewer` |
 | Database, persistence, schema, migration, cache | `engineering/data-management.md`, `engineering/performance.md`, `engineering/reliability.md`, `engineering/security.md` as relevant |
 | Frontend, UI, mobile, client application | `engineering/frontend.md`, `engineering/accessibility-and-ux.md`, `engineering/testing.md`, `engineering/security.md` as relevant |
 | Performance/scale-sensitive behavior | `engineering/performance.md`, `engineering/observability.md`, `engineering/reliability.md` |

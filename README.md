@@ -8,7 +8,7 @@ A stack-neutral, rule-ID-based engineering agent starter framework. This contain
 2. **Detailed engineering rules** — architecture, clean code, testing/TDD/BDD, security, performance, reliability, APIs, data, observability, frontend, accessibility/UX, infrastructure, CI/CD, documentation, Git/review, and cross-cutting practices.
 3. **Rule catalogue** — `.opencode/rules/RULE-CATALOG.md` maps stable IDs and ranges to their authoritative files.
 4. **OpenCode agents** — primary developer plus read-only explorer and specialist reviewers.
-5. **On-demand skills** — stack-neutral and sample technology skills that can be expanded for your real project.
+5. **On-demand technology skills** — sample technology/framework skills (`postgresql`, `react-typescript`, `spring-boot`, `terraform`) that can be replaced or expanded for your real project stack.
 6. **Spec Kit lifecycle mapping** — which agent to use at specify, plan, tasks, analyze, implement, converge, and final review stages.
 7. **Adoption guides and templates** — installation, agent selection, skill authoring, rule loading, and constitution input.
 
@@ -20,8 +20,8 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 
 ## Compatibility and version requirements
 
-- **OpenCode:** Targets **OpenCode V2** (`permissions` array with `{ "action", "resource", "effect" }`, `shell`, and `subagent` actions). OpenCode V1 (`permission` map, `bash`, and `task` keys) is not directly compatible without translating permission keys.
-- **Spec Kit (`specify-cli`):** Tested with **Spec Kit `>= 1.2.x`** (`specify init <project> --integration opencode` and `specify integration install opencode`, including `/speckit.converge`).
+- **OpenCode:** Targets **OpenCode V2** (`permissions` array with `{ "action", "resource", "effect" }`, `shell`, and `subagent` actions; install via `npm install -g @opencode/cli` or `curl -fsSL https://opencode.ai/v2/install | bash`). Note that `npm install -g opencode-ai` installs OpenCode V1 (`permission` map, `bash`, and `task` keys), which is not compatible with V2 configuration files.
+- **Spec Kit (`specify-cli`):** Tested with **Spec Kit `>= 1.2.x`** (`specify init <project> --integration opencode` and `specify integration install opencode`, including `/speckit.converge`). If Spec Kit generates an `opencode.json` file alongside `opencode.jsonc`, merge its keys into `opencode.jsonc` and remove the duplicate file so one does not shadow the other.
 - **Validation & Doctor CLI:** Requires **Python `>= 3.10`** (standard library only; no third-party packages required) to run `python3 scripts/validate_harness.py`.
 
 ## Suggested installation steps
@@ -30,7 +30,7 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 2. Back up or commit current project state.
 3. For a new project, initialize Spec Kit for OpenCode using the current official integration instructions. For an existing Spec Kit project, install the OpenCode integration using the supported command for your installed Spec Kit version.
 4. Merge this template into the repository. Do not overwrite existing `AGENTS.md`, OpenCode configuration, or `.opencode/` files blindly.
-5. Merge `opencode.jsonc` instructions and permissions into the existing OpenCode config; avoid multiple conflicting config files. Keep sensitive-file `read` rules (`*.env`, private keys, credentials) after `{ "action": "read", "resource": "*", "effect": "allow" }` so OpenCode V2's last-match-wins evaluation enforces them.
+5. Merge `opencode.jsonc` instructions and permissions into the existing OpenCode config; avoid multiple conflicting config files.
 6. Preserve Spec Kit-generated `.opencode/commands/` and integration event/plugin configuration.
 7. Tailor `.opencode/agents/` permissions and project instructions to your actual risk model.
 8. Run `/speckit.constitution` and create a concise project-specific constitution; use `docs/templates/constitution-input.md` as an input checklist.
@@ -50,7 +50,6 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 - `.opencode/rules/RULE-CATALOG.md`: audit index for all numbered requirements.
 - `.opencode/rules/rule-routing.json`: machine-readable domain and file-glob routing manifest used by `--preflight`.
 - `.opencode/skills/`: reusable instructions loaded on demand by technology/domain relevance.
-- `.ignore`: ripgrep ignore rules excluding `.env*` (except safe templates), private keys, and credential paths from `grep --hidden` directory searches.
 - `scripts/validate_harness.py`: zero-dependency validator (`--mode template`), project-readiness doctor (`--mode project`), and deterministic rule/skill preflight resolver (`--preflight`).
 - `tests/test_validate_harness.py`: automated regression tests for harness configuration, permissions, and rule catalogue integrity.
 - `docs/`: selection, installation, rule loading, and reusable templates.

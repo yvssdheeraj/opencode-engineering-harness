@@ -23,11 +23,7 @@ Spec Kit commands are run in the OpenCode chat, not in the terminal. The OpenCod
 2. Merge `opencode.jsonc` fields into the repository's existing OpenCode config. Do not maintain duplicate conflicting config files.
 3. Merge root `AGENTS.md` guidance into the existing one. Preserve repository-specific facts and generated instructions.
 4. Leave Spec Kit's `.opencode/commands/` and `.opencode/plugin/` intact.
-5. Inspect effective permissions. This starter allows workspace reads, skill loading, and read-only Git commands (`git status *`, `git diff *`, `git log *`, `git show *`), prompts for `.env` reads (`*.env`, `*.env.*` except `.env.example`/`.env.sample`/`.env.template`) and external directories (`external_directory`), denies private key/credential reads (`*.pem`, `*.key`, `.aws/*`, `.ssh/*`, `secrets/*`, `*credentials*`), and asks before other shell commands; reviewers deny edits and non-Git shell execution.
-   - **Important OpenCode V2 `grep` boundary note:** In OpenCode V2, `grep` checks `external_directory` and matches `permission` against the requested regular expression (`input.pattern`), not file paths—and runs `rg --no-config --hidden`. This repository ships three layers of defense-in-depth:
-     1. A tracked `.ignore` file (honored by `rg --no-config --hidden` during directory searches) that excludes `.env*` (except safe templates), `*.pem`, `*.key`, `.aws/`, `.ssh/`, `secrets/`, and `*credentials*`.
-     2. `grep` permission rules in `opencode.jsonc` that gate whole-line catch-all dump regexes (`.*`, `.+`, `^.*`, `^.+`) with `ask` and block private-key header searches (`*PRIVATE KEY*`, `*BEGIN * KEY*`) with `deny`.
-     3. However, if an agent passes a filename directly as `grep`'s `path` argument (for example `path: ".env"`), `rg` searches that explicit file without consulting `.ignore` or `read` permissions. For repositories that must keep live secrets inside the working tree, set `{ "action": "grep", "resource": "*", "effect": "ask" }` (or `"deny"` on untrusted subagents) or store credentials outside the workspace.
+5. Inspect effective permissions. `opencode.jsonc` relies on OpenCode V2's built-in defaults (`read`, `glob`, `grep`, `skill`, and `.env` approval prompts) and sets `shell`, `external_directory`, `websearch`, and `webfetch` to `"ask"` so OpenCode prompts the developer and stores **"Allow always"** command prefixes per project. `explorer` and `*-reviewer` agents deny `edit`, `subagent`, and non-Git `shell` commands.
 
 ## D. Tailor the project
 

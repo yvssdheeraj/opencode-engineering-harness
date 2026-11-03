@@ -37,7 +37,7 @@ The clarify, checklist, and analyze gates are especially valuable for meaningful
 - `checklist`: authentication/authorization, input validation, privacy, audit/telemetry, migration safety, failure behavior.
 - `tasks`: schema/migration, domain/service behavior, API endpoint, tests, documentation, metrics/logging as applicable.
 - `analyze`: fix missing dependencies or contradictions.
-- `implement`: developer loads `api-design`, `tdd`, and the detected framework/database skills. It does not load unrelated frontend/IaC skills.
+- `implement`: developer reads the applicable `.opencode/rules/engineering/*.md` files (`api-and-integration.md`, `testing.md`, `data-management.md`, `security.md`) and loads the detected framework/database skills (for example `spring-boot`, `postgresql`). It does not load unrelated frontend/IaC skills.
 - `review`: security-reviewer checks auth, hashing, sensitive data, enumeration; test-reviewer checks edge cases; code-reviewer checks final diff.
 - `converge`: close gaps against spec and tasks.
 
