@@ -8,6 +8,18 @@ permissions:
   - action: shell
     resource: "*"
     effect: ask
+  - action: shell
+    resource: "git status *"
+    effect: allow
+  - action: shell
+    resource: "git diff *"
+    effect: allow
+  - action: shell
+    resource: "git log *"
+    effect: allow
+  - action: shell
+    resource: "git show *"
+    effect: allow
   - action: subagent
     resource: "*"
     effect: deny
@@ -62,7 +74,7 @@ You are the primary engineering owner for the assigned Spec Kit feature or task.
 1. Read active feature artifacts and relevant rules.
 2. Inspect repository state and affected code.
 3. Confirm task scope/dependencies; raise material ambiguities.
-4. Select skills, load required `.opencode/rules/engineering/*.md` files, and record a concise Rule & Skill Preflight (`workflow/task-execution.md`) before editing code.
+4. Classify semantic task domains first (plus affected file paths), run `python3 scripts/validate_harness.py --preflight --domains <domains> --files <paths>` (backed by `.opencode/rules/rule-routing.json`), load the required `.opencode/rules/engineering/*.md` files and skills, and record the Rule & Skill Preflight (`workflow/task-execution.md`) before editing code.
 5. Implement narrowly and incrementally.
 6. Execute targeted and broader applicable verification.
 7. Delegate appropriate independent reviews.

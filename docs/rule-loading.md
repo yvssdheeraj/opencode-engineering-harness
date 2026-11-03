@@ -24,12 +24,14 @@ Conditional loading is an explicit agent procedure. It is not an automatic rule 
 
 ## Rule and skill preflight (`.opencode/rules/rule-routing.json`)
 
-To prevent accidental omission of cross-cutting rules (for example forgetting `engineering/security.md` on an authorization or persistence change), `.opencode/rules/rule-routing.json` provides a machine-readable mapping from task domains and file-path globs to required engineering rules, candidate skills, quality gates, and specialist reviewers.
+`.opencode/rules/rule-routing.json` is the single machine-readable source of truth mapping task domains and file-path globs to required engineering rules, candidate skills, quality gates, and specialist reviewers (`scripts/validate_harness.py` verifies that `AGENTS.md` and `rule-routing.json` stay synchronized).
 
-Before modifying code, the primary `developer` agent can run the deterministic preflight resolver (or compute the union from `.opencode/rules/rule-routing.json`) and record the **Rule and Skill Preflight** block (see `.opencode/rules/workflow/task-execution.md`):
+Always classify **semantic task domains** (`--domains`) first—because a change in a generic path like `src/user_service.py` can still affect `security`, `database`, or `performance`—and pass changed file paths (`--files`) as an additional safety net:
 
 ```sh
 python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/auth/login.ts db/migrations/V1__init.sql
+# Machine-readable JSON output:
+python3 scripts/validate_harness.py --preflight --json --domains api,database,security --files src/auth/login.ts
 ```
 
 ```text

@@ -15,7 +15,7 @@ class ValidateHarnessTests(unittest.TestCase):
     def _copy_repo_to_temp(self) -> pathlib.Path:
         tmp_dir = pathlib.Path(tempfile.mkdtemp(prefix="harness-test-"))
         self.addCleanup(lambda: shutil.rmtree(tmp_dir, ignore_errors=True))
-        for item in ("opencode.jsonc", ".ignore", "AGENTS.md", "README.md", ".opencode", "docs", "scripts"):
+        for item in ("opencode.jsonc", ".ignore", ".gitignore", "AGENTS.md", "README.md", ".opencode", "docs", "scripts"):
             src = REPO_ROOT / item
             dst = tmp_dir / item
             if src.is_dir():
@@ -68,7 +68,10 @@ class ValidateHarnessTests(unittest.TestCase):
         tmp_root = self._copy_repo_to_temp()
         reviewer_path = tmp_root / ".opencode" / "agents" / "code-reviewer.md"
         text = reviewer_path.read_text(encoding="utf-8")
-        mutated = text.replace("  - action: edit\n    resource: \"*\"\n    effect: deny", "  - action: edit\n    resource: \"*\"\n    effect: allow")
+        mutated = text.replace(
+            "  - action: shell\n    resource: \"git show *\"\n    effect: allow",
+            "  - action: shell\n    resource: \"git show *\"\n    effect: allow\n  - action: edit\n    resource: \"*\"\n    effect: allow",
+        )
         reviewer_path.write_text(mutated, encoding="utf-8")
 
         findings = validate_harness.validate_repository(tmp_root, mode="template")
@@ -137,8 +140,8 @@ class ValidateHarnessTests(unittest.TestCase):
         explorer_path = tmp_root / ".opencode" / "agents" / "explorer.md"
         explorer_path.write_text(
             explorer_path.read_text(encoding="utf-8").replace(
-                "  - action: edit\n    resource: \"*\"\n    effect: deny",
-                "  - action: edit\n    resource: \"*\"\n    effect: deny\n  - action: write\n    resource: \"*\"\n    effect: deny",
+                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny",
+                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny\n  - action: write\n    resource: \"*\"\n    effect: deny",
             ),
             encoding="utf-8",
         )
@@ -239,6 +242,44 @@ class ValidateHarnessTests(unittest.TestCase):
             matched_files,
             {".env.example"},
             f"Expected .ignore to block all secret files except .env.example under rg --no-config --hidden; got: {matched_files}",
+        )
+
+    def test_detects_developer_clobbering_global_git_permissions(self) -> None:
+        tmp_root = self._copy_repo_to_temp()
+        dev_path = tmp_root / ".opencode" / "agents" / "developer.md"
+        # Append shell:* -> ask at the end of developer.md so it overrides git status * -> allow
+        dev_path.write_text(
+            dev_path.read_text(encoding="utf-8").replace(
+                "  - action: subagent\n    resource: \"infra-reviewer\"\n    effect: allow",
+                "  - action: subagent\n    resource: \"infra-reviewer\"\n    effect: allow\n  - action: shell\n    resource: \"*\"\n    effect: ask",
+            ),
+            encoding="utf-8",
+        )
+
+        findings = validate_harness.validate_repository(tmp_root, mode="template")
+        agent_failures = [f for f in findings if f.level == "FAIL" and f.category == "agents"]
+        self.assertTrue(
+            any("developer.md" in f.message and "git status" in f.message for f in agent_failures),
+            f"Expected merged permission check to catch developer overriding git status *, got: {agent_failures}",
+        )
+
+    def test_detects_reviewer_missing_default_deny_for_mcp_and_external_actions(self) -> None:
+        tmp_root = self._copy_repo_to_temp()
+        sec_rev = tmp_root / ".opencode" / "agents" / "security-reviewer.md"
+        # Replace default-deny (*: deny) with edit-only deny so MCP actions fall through to BASE_V2_POLICY allow
+        sec_rev.write_text(
+            sec_rev.read_text(encoding="utf-8").replace(
+                "  - action: \"*\"\n    resource: \"*\"\n    effect: deny",
+                "  - action: edit\n    resource: \"*\"\n    effect: deny\n  - action: subagent\n    resource: \"*\"\n    effect: deny\n  - action: shell\n    resource: \"*\"\n    effect: deny",
+            ),
+            encoding="utf-8",
+        )
+
+        findings = validate_harness.validate_repository(tmp_root, mode="template")
+        agent_failures = [f for f in findings if f.level == "FAIL" and f.category == "agents"]
+        self.assertTrue(
+            any("security-reviewer.md" in f.message and "github_create_issue" in f.message for f in agent_failures),
+            f"Expected reviewer without *:deny to fail MCP action denial check, got: {agent_failures}",
         )
 
 

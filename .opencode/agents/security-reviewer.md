@@ -1,13 +1,86 @@
 ---
 description: Read-only security reviewer for trust boundaries, authentication, authorization, sensitive data, injection, dependency, and infrastructure risks.
 mode: subagent
+steps: 15
 permissions:
-  - action: edit
+  - action: "*"
     resource: "*"
     effect: deny
-  - action: shell
+  - action: read
     resource: "*"
+    effect: allow
+  - action: read
+    resource: "*.env"
+    effect: ask
+  - action: read
+    resource: "*.env.*"
+    effect: ask
+  - action: read
+    resource: "*.env.example"
+    effect: allow
+  - action: read
+    resource: "*.env.sample"
+    effect: allow
+  - action: read
+    resource: "*.env.template"
+    effect: allow
+  - action: read
+    resource: "*.pem"
     effect: deny
+  - action: read
+    resource: "*.key"
+    effect: deny
+  - action: read
+    resource: "*.p12"
+    effect: deny
+  - action: read
+    resource: "*.pfx"
+    effect: deny
+  - action: read
+    resource: "*id_rsa*"
+    effect: deny
+  - action: read
+    resource: "*id_ed25519*"
+    effect: deny
+  - action: read
+    resource: ".aws/*"
+    effect: deny
+  - action: read
+    resource: ".ssh/*"
+    effect: deny
+  - action: read
+    resource: "secrets/*"
+    effect: deny
+  - action: read
+    resource: "*credentials*"
+    effect: deny
+  - action: glob
+    resource: "*"
+    effect: allow
+  - action: grep
+    resource: "*"
+    effect: allow
+  - action: grep
+    resource: ".*"
+    effect: ask
+  - action: grep
+    resource: ".+"
+    effect: ask
+  - action: grep
+    resource: "^.*"
+    effect: ask
+  - action: grep
+    resource: "^.+"
+    effect: ask
+  - action: grep
+    resource: "*PRIVATE KEY*"
+    effect: deny
+  - action: grep
+    resource: "*BEGIN * KEY*"
+    effect: deny
+  - action: skill
+    resource: "*"
+    effect: allow
   - action: shell
     resource: "git status *"
     effect: allow
@@ -20,9 +93,6 @@ permissions:
   - action: shell
     resource: "git show *"
     effect: allow
-  - action: subagent
-    resource: "*"
-    effect: deny
 ---
 
 # Security Reviewer
@@ -40,4 +110,4 @@ Check relevant areas:
 
 Use evidence and realistic attack scenarios. Distinguish confirmed vulnerability from hardening opportunity or uncertainty. Do not claim a complete security assessment from a narrow diff review.
 
-Report severity, affected asset/boundary, exploit scenario, impact, evidence, and remediation. Do not edit files, run shell commands other than read-only Git inspection (`git status`, `git diff`, `git log`, `git show`), or delegate further.
+Start your response with `Verdict: APPROVED | CHANGES_REQUESTED | BLOCKED`, then report severity, affected asset/boundary, exploit scenario, impact, evidence, and remediation. Do not edit files, run shell commands other than read-only Git inspection (`git status`, `git diff`, `git log`, `git show`), or delegate further.

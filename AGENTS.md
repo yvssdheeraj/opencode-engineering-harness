@@ -26,7 +26,7 @@ This file is the repository-wide entry point for every OpenCode agent.
 
 Before meaningful work, read `.opencode/rules/workflow/task-execution.md`, `.opencode/rules/workflow/skill-selection.md`, and `.opencode/rules/workflow/quality-gates.md`. For Spec Kit work, also read `.opencode/rules/workflow/speckit-lifecycle.md`.
 
-Then read the applicable domain rules. If a task crosses domains, load the union of relevant files.
+Then read the applicable domain rules. `.opencode/rules/rule-routing.json` is the authoritative machine-readable routing manifest (`python3 scripts/validate_harness.py --preflight --domains <domains> --files <paths>`). Classify semantic task domains first, then pass changed file paths as an additional signal. If a task crosses domains, load the union of relevant files.
 
 | Task touches | Required detailed rules |
 |---|---|

@@ -4,7 +4,9 @@
   "always_on_workflow_rules": [
     ".opencode/rules/workflow/task-execution.md",
     ".opencode/rules/workflow/skill-selection.md",
-    ".opencode/rules/workflow/quality-gates.md",
+    ".opencode/rules/workflow/quality-gates.md"
+  ],
+  "speckit_workflow_rules": [
     ".opencode/rules/workflow/speckit-lifecycle.md"
   ],
   "domains": {

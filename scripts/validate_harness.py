@@ -150,12 +150,24 @@ REQUIRED_IGNORE_PATTERNS = [
     ".env",
     ".env.*",
     "!.env.example",
+    "!.env.sample",
+    "!.env.template",
     "*.pem",
     "*.key",
+    "*.p12",
+    "*.pfx",
+    "*id_rsa*",
+    "*id_ed25519*",
     ".aws/",
     ".ssh/",
     "secrets/",
     "*credentials*",
+]
+BASE_V2_POLICY = [
+    {"action": "*", "resource": "*", "effect": "allow"},
+    {"action": "read", "resource": "*.env", "effect": "ask"},
+    {"action": "read", "resource": "*.env.*", "effect": "ask"},
+    {"action": "read", "resource": "*.env.example", "effect": "allow"},
 ]
 MAX_ALWAYS_ON_ESTIMATED_TOKENS = 7000
 SKILL_ID_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -621,30 +633,31 @@ def check_opencode_config(root: pathlib.Path, findings: list[CheckFinding]) -> d
                     )
                 )
 
-    ignore_path = root / ".ignore"
-    if not ignore_path.is_file():
-        findings.append(
-            CheckFinding(
-                "FAIL",
-                "security",
-                "Missing root .ignore file to prevent ripgrep (rg --hidden) from indexing secret files during directory searches.",
-            )
-        )
-    else:
-        ignore_lines = {
-            line.strip()
-            for line in ignore_path.read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        }
-        missing_ignore = [pat for pat in REQUIRED_IGNORE_PATTERNS if pat not in ignore_lines]
-        if missing_ignore:
+    for ignore_filename in (".ignore", ".gitignore"):
+        ignore_path = root / ignore_filename
+        if not ignore_path.is_file():
             findings.append(
                 CheckFinding(
                     "FAIL",
                     "security",
-                    f".ignore is missing required ripgrep secret-protection patterns: {missing_ignore}.",
+                    f"Missing root {ignore_filename} file for secret exclusion.",
                 )
             )
+        else:
+            ignore_lines = {
+                line.strip()
+                for line in ignore_path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            }
+            missing_ignore = [pat for pat in REQUIRED_IGNORE_PATTERNS if pat not in ignore_lines]
+            if missing_ignore:
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"{ignore_filename} is missing required secret-protection patterns: {missing_ignore}.",
+                    )
+                )
 
     if not any(f.level == "FAIL" and f.category in ("config", "security", "permissions") for f in findings):
         findings.append(
@@ -657,7 +670,11 @@ def check_opencode_config(root: pathlib.Path, findings: list[CheckFinding]) -> d
     return config
 
 
-def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
+def check_agents(
+    root: pathlib.Path,
+    global_rules: list[dict[str, str]],
+    findings: list[CheckFinding],
+) -> set[str]:
     agents_dir = root / ".opencode" / "agents"
     if not agents_dir.is_dir():
         findings.append(CheckFinding("FAIL", "agents", "Missing .opencode/agents directory."))
@@ -733,16 +750,29 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
         if not rules:
             continue
 
+        # OpenCode V2 evaluates base policy + global opencode.jsonc rules + agent rules (last match wins)
+        effective_rules = BASE_V2_POLICY + global_rules + rules
+
         if agent_id == "developer":
             if mode != "primary":
                 findings.append(
                     CheckFinding("FAIL", "agents", f"{rel_label} must have mode 'primary', found {mode!r}.")
                 )
-            if resolve_permission(rules, "edit", "src/main.py") != "allow":
+            if resolve_permission(effective_rules, "edit", "src/main.py") != "allow":
                 findings.append(CheckFinding("FAIL", "agents", "developer.md must allow 'edit' on workspace files."))
-            if resolve_permission(rules, "shell", "npm test") != "ask":
+            if resolve_permission(effective_rules, "shell", "npm test") != "ask":
                 findings.append(CheckFinding("FAIL", "agents", "developer.md must keep arbitrary 'shell' on 'ask'."))
-            if resolve_permission(rules, "subagent", "unlisted-agent") != "deny":
+            for allowed_git_cmd in ("git status", "git status --short", "git diff", "git log -n 3", "git show HEAD"):
+                eff = resolve_permission(effective_rules, "shell", allowed_git_cmd)
+                if eff != "allow":
+                    findings.append(
+                        CheckFinding(
+                            "FAIL",
+                            "agents",
+                            f"developer.md effective permissions (merged with opencode.jsonc) must allow read-only Git command {allowed_git_cmd!r} (resolved to {eff!r}).",
+                        )
+                    )
+            if resolve_permission(effective_rules, "subagent", "unlisted-agent") != "deny":
                 findings.append(
                     CheckFinding("FAIL", "agents", "developer.md must deny unlisted subagents by default.")
                 )
@@ -758,7 +788,7 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                             )
                         )
             for req_sub in sorted(expected_subagents):
-                if resolve_permission(rules, "subagent", req_sub) != "allow":
+                if resolve_permission(effective_rules, "subagent", req_sub) != "allow":
                     findings.append(
                         CheckFinding(
                             "FAIL",
@@ -771,25 +801,46 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                 findings.append(
                     CheckFinding("FAIL", "agents", f"{rel_label} must have mode 'subagent', found {mode!r}.")
                 )
-            eff = resolve_permission(rules, "edit", "src/app.py")
-            if eff != "deny":
+            steps_val = fm.get("steps")
+            if not isinstance(steps_val, str) or not steps_val.isdigit() or not (1 <= int(steps_val) <= 30):
                 findings.append(
                     CheckFinding(
                         "FAIL",
                         "agents",
-                        f"Read-only subagent {rel_label} must deny 'edit' (which governs edit/write/patch in V2; resolved to {eff!r}).",
+                        f"Read-only subagent {rel_label} must declare a bounded integer 'steps' limit (1-30), found {steps_val!r}.",
                     )
                 )
-            if resolve_permission(rules, "subagent", "explorer") != "deny":
+            if agent_id.endswith("-reviewer") and "Verdict: APPROVED | CHANGES_REQUESTED | BLOCKED" not in body:
                 findings.append(
                     CheckFinding(
                         "FAIL",
                         "agents",
-                        f"Read-only subagent {rel_label} must deny recursive subagent delegation.",
+                        f"Reviewer {rel_label} must require the structured 'Verdict: APPROVED | CHANGES_REQUESTED | BLOCKED' header.",
                     )
                 )
+            for denied_action, sample_res in (
+                ("edit", "src/app.py"),
+                ("subagent", "explorer"),
+                ("execute", "*"),
+                ("browser", "*"),
+                ("webfetch", "https://example.com"),
+                ("websearch", "opencode"),
+                ("question", "*"),
+                ("external_directory", "../outside/*"),
+                ("github_create_issue", "*"),
+                ("slack_post_message", "*"),
+            ):
+                eff = resolve_permission(effective_rules, denied_action, sample_res)
+                if eff != "deny":
+                    findings.append(
+                        CheckFinding(
+                            "FAIL",
+                            "agents",
+                            f"Read-only subagent {rel_label} effective permissions must deny {denied_action!r} (resolved to {eff!r}).",
+                        )
+                    )
             for forbidden_cmd in ("rm -rf /", "git commit -m x", "git push", "git status-malicious"):
-                eff = resolve_permission(rules, "shell", forbidden_cmd)
+                eff = resolve_permission(effective_rules, "shell", forbidden_cmd)
                 if eff != "deny":
                     findings.append(
                         CheckFinding(
@@ -799,7 +850,7 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                         )
                     )
             for allowed_git_cmd in ("git status", "git status --short", "git diff", "git log -n 3", "git show HEAD"):
-                eff = resolve_permission(rules, "shell", allowed_git_cmd)
+                eff = resolve_permission(effective_rules, "shell", allowed_git_cmd)
                 if eff != "allow":
                     findings.append(
                         CheckFinding(
@@ -808,6 +859,43 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                             f"Read-only subagent {rel_label} must allow read-only Git command {allowed_git_cmd!r} (resolved to {eff!r}).",
                         )
                     )
+            if resolve_permission(effective_rules, "read", "src/app.py") != "allow":
+                findings.append(
+                    CheckFinding("FAIL", "agents", f"Read-only subagent {rel_label} must allow reading source files.")
+                )
+            if resolve_permission(effective_rules, "read", ".env") not in ("ask", "deny"):
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"Read-only subagent {rel_label} overrides global .env protection (must be 'ask' or 'deny').",
+                    )
+                )
+            for secret_sample in ("private.key", "server.pem", ".aws/credentials", "secrets/prod.json"):
+                if resolve_permission(effective_rules, "read", secret_sample) != "deny":
+                    findings.append(
+                        CheckFinding(
+                            "FAIL",
+                            "security",
+                            f"Read-only subagent {rel_label} overrides global secret denial on {secret_sample!r}.",
+                        )
+                    )
+            if resolve_permission(effective_rules, "grep", ".*") not in ("ask", "deny"):
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"Read-only subagent {rel_label} overrides global grep catch-all dump protection.",
+                    )
+                )
+            if resolve_permission(effective_rules, "grep", "PRIVATE KEY") != "deny":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"Read-only subagent {rel_label} overrides global grep private-key denial.",
+                    )
+                )
 
     if not any(f.level == "FAIL" and f.category == "agents" for f in findings):
         findings.append(
@@ -1110,7 +1198,11 @@ def check_references(
         )
 
 
-def check_templates(root: pathlib.Path, findings: list[CheckFinding]) -> None:
+def check_templates(
+    root: pathlib.Path,
+    global_rules: list[dict[str, str]],
+    findings: list[CheckFinding],
+) -> None:
     worker_template = root / "docs" / "templates" / "implementation-worker-agent.md"
     if not worker_template.is_file():
         findings.append(
@@ -1155,8 +1247,9 @@ def check_templates(root: pathlib.Path, findings: list[CheckFinding]) -> None:
 
     rules = validate_permission_list(fm.get("permissions"), rel_label, findings)
     if rules:
+        effective_rules = BASE_V2_POLICY + global_rules + rules
         for allowed_path in ("src/module-a/index.ts", "tests/module-a/index.test.ts"):
-            eff = resolve_permission(rules, "edit", allowed_path)
+            eff = resolve_permission(effective_rules, "edit", allowed_path)
             if eff != "allow":
                 findings.append(
                     CheckFinding(
@@ -1173,7 +1266,7 @@ def check_templates(root: pathlib.Path, findings: list[CheckFinding]) -> None:
             "specs/001-feature/spec.md",
             "db/migrations/001_init.sql",
         ):
-            eff = resolve_permission(rules, "edit", denied_path)
+            eff = resolve_permission(effective_rules, "edit", denied_path)
             if eff != "deny":
                 findings.append(
                     CheckFinding(
@@ -1182,15 +1275,24 @@ def check_templates(root: pathlib.Path, findings: list[CheckFinding]) -> None:
                         f"{rel_label} must deny 'edit' on out-of-scope/shared path {denied_path!r} (resolved to {eff!r}).",
                     )
                 )
-        if resolve_permission(rules, "subagent", "explorer") != "deny":
+        for denied_action in ("subagent", "execute", "browser", "github_create_issue"):
+            if resolve_permission(effective_rules, denied_action, "*") != "deny":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "templates",
+                        f"{rel_label} must deny {denied_action!r} under effective permissions.",
+                    )
+                )
+        if resolve_permission(effective_rules, "read", "private.key") != "deny":
             findings.append(
-                CheckFinding("FAIL", "templates", f"{rel_label} must deny recursive subagent launches.")
+                CheckFinding("FAIL", "templates", f"{rel_label} must preserve secret read denial on 'private.key'.")
             )
-        if resolve_permission(rules, "shell", "rm -rf /") != "deny":
+        if resolve_permission(effective_rules, "shell", "rm -rf /") != "deny":
             findings.append(
                 CheckFinding("FAIL", "templates", f"{rel_label} must deny arbitrary shell commands.")
             )
-        if resolve_permission(rules, "shell", "git status --short") != "allow":
+        if resolve_permission(effective_rules, "shell", "git status --short") != "allow":
             findings.append(
                 CheckFinding("FAIL", "templates", f"{rel_label} must allow read-only 'git status *'.")
             )
@@ -1228,17 +1330,38 @@ def check_rule_routing(
         findings.append(CheckFinding("FAIL", "routing", "rule-routing.json root must be an object."))
         return None
 
+    expected_always_on_wf = [
+        ".opencode/rules/workflow/task-execution.md",
+        ".opencode/rules/workflow/skill-selection.md",
+        ".opencode/rules/workflow/quality-gates.md",
+    ]
     workflow_rules = manifest.get("always_on_workflow_rules")
-    if not isinstance(workflow_rules, list) or not workflow_rules:
+    if workflow_rules != expected_always_on_wf:
         findings.append(
-            CheckFinding("FAIL", "routing", "rule-routing.json must define 'always_on_workflow_rules'.")
+            CheckFinding(
+                "FAIL",
+                "routing",
+                f"rule-routing.json 'always_on_workflow_rules' must be {expected_always_on_wf} (Spec Kit lifecycle is conditional); found {workflow_rules!r}.",
+            )
         )
     else:
         for wf_path in workflow_rules:
-            if not isinstance(wf_path, str) or not (root / wf_path).is_file():
+            if not (root / wf_path).is_file():
                 findings.append(
                     CheckFinding("FAIL", "routing", f"rule-routing.json workflow rule missing: {wf_path!r}.")
                 )
+
+    speckit_wf = manifest.get("speckit_workflow_rules")
+    if speckit_wf != [".opencode/rules/workflow/speckit-lifecycle.md"] or not (
+        root / ".opencode/rules/workflow/speckit-lifecycle.md"
+    ).is_file():
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "routing",
+                "rule-routing.json must list '.opencode/rules/workflow/speckit-lifecycle.md' under 'speckit_workflow_rules'.",
+            )
+        )
 
     domains = manifest.get("domains")
     if not isinstance(domains, dict) or not domains:
@@ -1304,6 +1427,22 @@ def check_rule_routing(
                     "FAIL",
                     "routing",
                     f"Engineering rule files not reachable from any domain in rule-routing.json: {unrouted}.",
+                )
+            )
+
+    agents_md_path = root / "AGENTS.md"
+    if agents_md_path.is_file():
+        agents_eng_refs = set(
+            re.findall(r"`(engineering/[a-z0-9-]+\.md)`", agents_md_path.read_text(encoding="utf-8"))
+        )
+        if agents_eng_refs != referenced_eng_rules:
+            diff_a = sorted(agents_eng_refs - referenced_eng_rules)
+            diff_b = sorted(referenced_eng_rules - agents_eng_refs)
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "routing",
+                    f"AGENTS.md routing table and rule-routing.json disagree on engineering rules (only_in_agents_md={diff_a}, only_in_json={diff_b}).",
                 )
             )
 
@@ -1430,52 +1569,14 @@ def compute_preflight(
         "domains": matched_domains,
         "files": files or [],
         "always_on_workflow_rules": manifest.get("always_on_workflow_rules", []),
+        "speckit_workflow_rules": manifest.get("speckit_workflow_rules", []),
         "engineering_rules": rules,
         "skills": skills,
         "quality_gates": quality_gates,
         "reviewers": reviewers,
         "formatted": "\n".join(block_lines),
     }
-    agents_md = root / "AGENTS.md"
-    if agents_md.is_file():
-        lines = agents_md.read_text(encoding="utf-8").splitlines()
-        todo_lines = [line.strip() for line in lines if re.search(r":\s*TODO\b", line)]
-        if todo_lines:
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "readiness",
-                    f"AGENTS.md still has {len(todo_lines)} unresolved project-specific TODO placeholder(s): {todo_lines}",
-                )
-            )
-        else:
-            findings.append(
-                CheckFinding("PASS", "readiness", "AGENTS.md project-specific facts are populated (no TODOs).")
-            )
 
-    constitution = root / ".specify" / "memory" / "constitution.md"
-    if constitution.is_file():
-        findings.append(CheckFinding("PASS", "readiness", "Found .specify/memory/constitution.md."))
-    else:
-        findings.append(
-            CheckFinding(
-                "WARN",
-                "readiness",
-                "Missing .specify/memory/constitution.md (run '/speckit.constitution' after initializing Spec Kit).",
-            )
-        )
-
-    commands_dir = root / ".opencode" / "commands"
-    if commands_dir.is_dir() and any(commands_dir.iterdir()):
-        findings.append(CheckFinding("PASS", "readiness", "Found Spec Kit commands in .opencode/commands/."))
-    else:
-        findings.append(
-            CheckFinding(
-                "WARN",
-                "readiness",
-                "No Spec Kit command files found in .opencode/commands/ (run 'specify init . --integration opencode' or 'specify integration install opencode').",
-            )
-        )
 
 def _parse_semver(text: str) -> tuple[int, int, int] | None:
     m = re.search(r"\b(\d+)\.(\d+)\.(\d+)\b", text)
@@ -1542,7 +1643,15 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
             )
             out = (proc.stdout or proc.stderr or "").strip()
             ver = _parse_semver(out)
-            if ver is not None and ver[0] < 2:
+            if proc.returncode != 0:
+                findings.append(
+                    CheckFinding(
+                        "WARN",
+                        "readiness",
+                        f"CLI tool 'opencode --version' exited with non-zero status {proc.returncode}: {out[:120]!r}",
+                    )
+                )
+            elif ver is not None and ver[0] < 2:
                 findings.append(
                     CheckFinding(
                         "WARN",
@@ -1576,7 +1685,15 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
             )
             out = (proc.stdout or proc.stderr or "").strip()
             ver = _parse_semver(out)
-            if ver is not None and (ver[0], ver[1]) < (1, 2):
+            if proc.returncode != 0:
+                findings.append(
+                    CheckFinding(
+                        "WARN",
+                        "readiness",
+                        f"CLI tool 'specify version' exited with non-zero status {proc.returncode}: {out[:120]!r}",
+                    )
+                )
+            elif ver is not None and (ver[0], ver[1]) < (1, 2):
                 findings.append(
                     CheckFinding(
                         "WARN",
@@ -1600,10 +1717,20 @@ def validate_repository(root: pathlib.Path, *, mode: str = "template") -> list[C
         raise ValueError(f"Unsupported validation mode: {mode!r}")
 
     findings: list[CheckFinding] = []
-    check_opencode_config(root, findings)
-    agent_ids = check_agents(root, findings)
+    config = check_opencode_config(root, findings)
+    global_rules: list[dict[str, str]] = []
+    if isinstance(config, dict) and isinstance(config.get("permissions"), list):
+        global_rules = [
+            r
+            for r in config["permissions"]
+            if isinstance(r, dict)
+            and isinstance(r.get("action"), str)
+            and isinstance(r.get("resource"), str)
+            and r.get("effect") in VALID_EFFECTS
+        ]
+    agent_ids = check_agents(root, global_rules, findings)
     skill_ids = check_skills(root, findings)
-    check_templates(root, findings)
+    check_templates(root, global_rules, findings)
     check_rule_catalog(root, findings)
     check_rule_routing(root, skill_ids, agent_ids, findings)
     check_context_budget(root, findings)

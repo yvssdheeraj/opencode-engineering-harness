@@ -14,12 +14,22 @@ Thumbs.db
 *.swo
 *~
 
-# Environment & secrets (never commit)
+# Environment & secrets (never commit; aligned with .ignore and opencode.jsonc)
 .env
 .env.*
 !.env.example
+!.env.sample
+!.env.template
 *.pem
 *.key
+*.p12
+*.pfx
+*id_rsa*
+*id_ed25519*
+.aws/
+.ssh/
+secrets/
+*credentials*
 
 # Node / npx (if running `npx skills` locally)
 node_modules/
