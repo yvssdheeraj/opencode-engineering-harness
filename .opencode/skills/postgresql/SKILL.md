@@ -5,12 +5,47 @@ description: Use when the affected system uses PostgreSQL and the task changes s
 
 # PostgreSQL Skill — Starter Guidance
 
-- Detect the supported PostgreSQL server version, extensions, migration tool, and client/ORM versions.
-- Prefer constraints for durable invariants; understand NULL semantics, uniqueness, foreign keys, and check constraints.
-- Review transaction isolation, locks, long-running transactions, and migration locking impact.
-- Use EXPLAIN (and EXPLAIN ANALYZE only when safe) to evaluate query plans with representative data.
-- Add indexes for measured query patterns and account for write/storage cost.
-- Use parameterized queries; never concatenate untrusted input into SQL.
-- Consider JSONB, partitioning, full-text search, and advanced features only when requirements justify them.
-- Use backward-compatible migration patterns for production data.
-- Avoid running destructive operations against shared or production databases without explicit authorization.
+## Supported scope
+
+- Technology and version range: PostgreSQL 14+ (inspect the repository's actual server version, Docker/Compose manifests, or cloud database config before using version-specific SQL features).
+- Runtime/build tooling: SQL migrations (Flyway, Liquibase, Alembic, Prisma, Drizzle, Goose, sqitch, or raw SQL) and application query layers.
+- Framework modules covered: relational schema design, DDL migrations, indexing, query plans, transactions/locking, and role/permission boundaries.
+- Out-of-scope technologies: non-PostgreSQL engines and application-specific ORM mapping idioms (load the application framework skill separately).
+
+## When to load
+
+Load when the affected system uses PostgreSQL and the task changes schemas, SQL queries, indexes, constraints, transactions, migrations, database roles, or persistence performance. Do not load for in-memory or non-PostgreSQL stores.
+
+## Before implementation
+
+- Detect the supported PostgreSQL server version, installed extensions (`pgcrypto`, `citext`, `pg_trgm`, `postgis`, etc.), migration tool, and client/ORM versions.
+- Inspect existing schema naming conventions, primary-key strategy, timestamp columns (`timestamptz` vs `timestamp`), and migration file ordering.
+- Check whether migrations run automatically on startup or in a separate deployment step.
+
+## Implementation standards
+
+- Prefer database constraints (`NOT NULL`, `UNIQUE`, `CHECK`, `FOREIGN KEY`, exclusion constraints) for durable data invariants; account for PostgreSQL `NULL` semantics in unique constraints (`NULLS NOT DISTINCT` requires PostgreSQL 15+).
+- Use backward-compatible expand-and-contract migrations for live tables; avoid long-held `ACCESS EXCLUSIVE` locks during online deployments (for example, consider `CREATE INDEX CONCURRENTLY` outside a transaction block, or adding `NOT VALID` constraints before validating).
+- Review transaction isolation (`READ COMMITTED` default vs `REPEATABLE READ` / `SERIALIZABLE`), lock ordering, statement timeouts, and idle-in-transaction timeouts.
+- Use parameterized queries exclusively; never concatenate untrusted input into SQL strings or dynamic PL/pgSQL.
+- Add indexes (`B-tree`, `GIN`, `GiST`, partial, or covering `INCLUDE` indexes) for measured query predicates and sort orders while accounting for write amplification and storage overhead.
+- Use `JSONB`, partitioning, or full-text search only when access patterns and query predicates justify them over normalized columns.
+
+## Testing and verification
+
+- Run forward migrations against a disposable local/containerized PostgreSQL instance and verify schema state and application compatibility.
+- Use `EXPLAIN` (and `EXPLAIN (ANALYZE, BUFFERS)` only in non-production or safe transaction-rolled-back environments) to verify index usage and avoid unexpected sequential scans or N+1 queries.
+- Test constraint violations, concurrent update races, null/boundary values, and rollback/forward-fix behavior.
+
+## Completion checklist
+
+- [ ] Implementation follows the actual PostgreSQL version and migration tool conventions.
+- [ ] Migrations and repository/integration tests executed and verified.
+- [ ] Lock impact, backward compatibility, and rollback/recovery strategy reviewed.
+- [ ] No hardcoded credentials or destructive shared-environment operations executed without authorization.
+
+## References
+
+- PostgreSQL official documentation: https://www.postgresql.org/docs/current/
+- PostgreSQL `ALTER TABLE` and concurrency notes: https://www.postgresql.org/docs/current/sql-altertable.html
+- PostgreSQL `EXPLAIN` usage: https://www.postgresql.org/docs/current/using-explain.html

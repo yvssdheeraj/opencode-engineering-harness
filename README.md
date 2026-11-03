@@ -18,20 +18,26 @@ The catalogue is comprehensive, but **not every rule applies to every task**. Ag
 
 Prompt instructions are guidance, not executable enforcement. Use CI checks, tests, linters, formatters, scanners, policy-as-code, and protected deployment workflows to enforce critical controls.
 
+## Compatibility and version requirements
+
+- **OpenCode:** Targets **OpenCode V2** (`permissions` array with `{ "action", "resource", "effect" }`, `shell`, and `subagent` actions). OpenCode V1 (`permission` map, `bash`, and `task` keys) is not directly compatible without translating permission keys.
+- **Spec Kit (`specify-cli`):** Tested with **Spec Kit `>= 1.2.x`** (`specify init <project> --integration opencode` and `specify integration install opencode`, including `/speckit.converge`).
+- **Validation & Doctor CLI:** Requires **Python `>= 3.10`** (standard library only; no third-party packages required) to run `python3 scripts/validate_harness.py`.
+
 ## Suggested installation steps
 
-1. Check your installed versions: `opencode --version` and `specify version`.
+1. Check your installed versions: `opencode --version`, `specify version`, and `python3 --version`.
 2. Back up or commit current project state.
 3. For a new project, initialize Spec Kit for OpenCode using the current official integration instructions. For an existing Spec Kit project, install the OpenCode integration using the supported command for your installed Spec Kit version.
 4. Merge this template into the repository. Do not overwrite existing `AGENTS.md`, OpenCode configuration, or `.opencode/` files blindly.
-5. Merge `opencode.jsonc` instructions and permissions into the existing OpenCode config; avoid multiple conflicting config files.
+5. Merge `opencode.jsonc` instructions and permissions into the existing OpenCode config; avoid multiple conflicting config files. Keep sensitive-file `read` rules (`*.env`, private keys, credentials) after `{ "action": "read", "resource": "*", "effect": "allow" }` so OpenCode V2's last-match-wins evaluation enforces them.
 6. Preserve Spec Kit-generated `.opencode/commands/` and integration event/plugin configuration.
 7. Tailor `.opencode/agents/` permissions and project instructions to your actual risk model.
 8. Run `/speckit.constitution` and create a concise project-specific constitution; use `docs/templates/constitution-input.md` as an input checklist.
 9. Populate repository-specific facts and actual commands in `AGENTS.md`.
 10. Tailor technology skills to actual languages/frameworks/versions.
-11. Pilot one low-risk feature with one primary developer and read-only reviewers.
-12. Adjust rules, automated checks, and delegation based on observed failure modes.
+11. Run `python3 scripts/validate_harness.py --mode project` to verify configuration integrity, permission boundaries, and project readiness.
+12. Pilot one low-risk feature with one primary developer and read-only reviewers, then adjust rules, automated checks, and delegation based on observed failure modes.
 
 ## Directory guide
 
@@ -43,12 +49,14 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 - `.opencode/rules/workflow/`: Spec Kit lifecycle, task execution, skill selection, and quality gates.
 - `.opencode/rules/RULE-CATALOG.md`: audit index for all numbered requirements.
 - `.opencode/skills/`: reusable instructions loaded on demand by technology/domain relevance.
+- `scripts/validate_harness.py`: zero-dependency validator (`--mode template`) and project-readiness doctor (`--mode project`).
+- `tests/test_validate_harness.py`: automated regression tests for harness configuration, permissions, and rule catalogue integrity.
 - `docs/`: selection, installation, rule loading, and reusable templates.
 
 ## Design defaults
 
 - One primary `developer` agent owns implementation and integration.
-- `explorer` and reviewers are read-only by default.
+- `explorer` and reviewers are strictly read-only at the permission layer.
 - The developer delegates only bounded, useful, non-overlapping tasks.
 - Keep subagent depth bounded; do not introduce recursive delegation until there is a demonstrated need.
 - Spec Kit remains the owner of feature artifacts and lifecycle commands.
@@ -57,10 +65,11 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 
 ## Official references
 
-- OpenCode rules: https://opencode.ai/docs/rules/
-- OpenCode agents: https://opencode.ai/docs/agents/
-- OpenCode skills: https://opencode.ai/docs/skills/
-- OpenCode configuration: https://opencode.ai/docs/config/
+- OpenCode V2 config: https://opencode.ai/v2/docs/config/
+- OpenCode V2 permissions: https://opencode.ai/v2/docs/permissions/
+- OpenCode V2 instructions & rules: https://opencode.ai/v2/docs/instructions/
+- OpenCode V2 agents: https://opencode.ai/v2/docs/agents/
+- OpenCode V2 skills: https://opencode.ai/v2/docs/skills/
 - Spec Kit: https://github.com/github/spec-kit
 - OWASP ASVS: https://owasp.org/www-project-application-security-verification-standard/
 - WCAG: https://www.w3.org/TR/WCAG22/

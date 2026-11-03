@@ -14,7 +14,7 @@ Spec Kit commands define the development lifecycle; OpenCode agents define who p
 | Plan a cross-cutting feature | developer | explorer; architecture-reviewer | Verify existing architecture and challenge design before tasks are fixed. |
 | Create checklists/tasks | developer | test-reviewer or security-reviewer for critique | Primary owns the plan/task artifacts and dependency order. |
 | Analyze artifacts | developer | explorer only for targeted fact-finding | Resolve contradictions in the source artifacts; don't let reviewers rewrite them. |
-| Implement | developer | initially avoid parallel writers | Single writer avoids overlapping file edits and integration confusion. Add write-capable workers only after boundaries are stable. |
+| Implement | developer | initially avoid parallel writers | Single writer avoids overlapping file edits and integration confusion. Add a path-scoped worker (`docs/templates/implementation-worker-agent.md`) only after boundaries are stable. |
 | Review implementation | developer | code-reviewer | Independent read-only review catches issues the implementer may miss. |
 | Security-sensitive change | developer | security-reviewer | Specialized threat/abuse-case review. |
 | Test strategy / critical flows | developer | test-reviewer | Challenge acceptance coverage, edge cases, and test-layer choice. |

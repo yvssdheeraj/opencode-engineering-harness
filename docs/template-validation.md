@@ -1,6 +1,23 @@
-# Template Validation Notes
+# Template Validation and Project Readiness
 
-## Structure and traceability
+## Automated validation (`scripts/validate_harness.py`)
+
+Run the zero-dependency validator to check configuration syntax, OpenCode V2 permission ordering, read-only reviewer contracts, skill frontmatter and template sections, all 323 rule IDs in `.opencode/rules/RULE-CATALOG.md`, and cross-file references:
+
+```sh
+# Validate the blueprint template itself (used in CI)
+python3 scripts/validate_harness.py --mode template
+
+# Run the automated unit test suite
+python3 -m unittest discover -s tests -v
+
+# Check project readiness after adopting the harness into a target repository
+python3 scripts/validate_harness.py --mode project
+```
+
+`--mode project` runs every template integrity check and additionally verifies that `AGENTS.md` `TODO` placeholders have been populated and checks for `.specify/memory/constitution.md`, `.opencode/commands/`, and installed `opencode` / `specify` CLIs.
+
+## Structure and traceability checklist
 
 - [ ] Every path referenced from `AGENTS.md` exists.
 - [ ] `opencode.jsonc` references all seven always-on common rule files.

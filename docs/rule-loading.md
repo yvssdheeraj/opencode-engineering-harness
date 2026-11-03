@@ -22,6 +22,21 @@ Root `AGENTS.md` contains a routing matrix. The agent identifies affected domain
 
 Conditional loading is an explicit agent procedure. It is not an automatic rule engine that evaluates file paths. The agent must use its read tool to load each referenced document that applies.
 
+## Rule and skill preflight
+
+Because conditional loading is procedural rather than enforced by a static file-path router, the primary `developer` agent must produce a compact **Rule and Skill Preflight** record before modifying code (see `.opencode/rules/workflow/task-execution.md`):
+
+```text
+RULE & SKILL PREFLIGHT
+Detected stack & versions: <languages, frameworks, build/test tools>
+Task domains: <API, database, security, frontend, IaC, etc.>
+Required engineering rules loaded: <exact .opencode/rules/engineering/*.md files>
+Skills loaded: <exact .opencode/skills/<id> names or "none">
+Applicable quality gates: <QG IDs>
+```
+
+Recording this preflight makes omitted domains (for example forgetting `engineering/security.md` on an authorization or persistence change) immediately visible during execution and review.
+
 ## Audit the full rule set
 
 `.opencode/rules/RULE-CATALOG.md` is the authoritative index of stable rule IDs. It maps every numbered requirement to its file. The expanded catalogue includes:

@@ -7,7 +7,7 @@ This file is the repository-wide entry point for every OpenCode agent.
 - Treat actual repository state and current project documentation as authoritative; detect stack and versions rather than assuming them.
 - Feature artifacts define feature intent; the Spec Kit constitution defines durable project-specific engineering principles.
 - The primary `developer` agent owns feature implementation, integration, final verification, convergence, and reporting.
-- Exploration and review agents are read-only by default. Grant write access only through a separate, explicit, bounded remediation assignment.
+- Exploration and review agents (`explorer` and `*-reviewer`) are strictly read-only at the permission layer. Prompt instructions cannot override their `edit`/`write` denials; if bounded parallel implementation is ever required, define a dedicated path-scoped worker agent (`docs/templates/implementation-worker-agent.md`) with explicit file ownership.
 - Preserve user changes and Spec Kit-generated files.
 
 ## Always-on instructions

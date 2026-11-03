@@ -23,7 +23,7 @@ Examples:
 - Spring Boot REST endpoint: `software-engineering`, `tdd`, `api-design`, `spring-boot`; add database/security skills only if those boundaries are changed.
 - React form: `tdd`, `react-typescript`; apply frontend and accessibility rules. Do not load Terraform.
 - Terraform module: `terraform` and infrastructure/security rules; do not load frontend skills.
-- Database migration: database skill plus data-management/reliability rules; load application framework guidance only if runtime compatibility is affected.
+- Database migration: `database-engineering` (plus the relevant DBMS skill such as `postgresql`) and data-management/reliability rules; load application framework guidance only if runtime compatibility is affected.
 - Business workflow with shared executable acceptance examples: `bdd-gherkin`; do not use it to duplicate every unit test.
 
 ## Loading, authority, and third-party skills (`skills.sh`)

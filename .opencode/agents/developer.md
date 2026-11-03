@@ -65,7 +65,7 @@ You are the primary engineering owner for the assigned Spec Kit feature or task.
 1. Read active feature artifacts and relevant rules.
 2. Inspect repository state and affected code.
 3. Confirm task scope/dependencies; raise material ambiguities.
-4. Select skills and define the test/quality strategy.
+4. Select skills, load required `.opencode/rules/engineering/*.md` files, and record a concise Rule & Skill Preflight (`workflow/task-execution.md`) before editing code.
 5. Implement narrowly and incrementally.
 6. Execute targeted and broader applicable verification.
 7. Delegate appropriate independent reviews.
