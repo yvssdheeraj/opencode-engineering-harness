@@ -48,8 +48,10 @@ Prompt instructions are guidance, not executable enforcement. Use CI checks, tes
 - `.opencode/rules/engineering/`: detailed standards loaded conditionally by task domain.
 - `.opencode/rules/workflow/`: Spec Kit lifecycle, task execution, skill selection, and quality gates.
 - `.opencode/rules/RULE-CATALOG.md`: audit index for all numbered requirements.
+- `.opencode/rules/rule-routing.json`: machine-readable domain and file-glob routing manifest used by `--preflight`.
 - `.opencode/skills/`: reusable instructions loaded on demand by technology/domain relevance.
-- `scripts/validate_harness.py`: zero-dependency validator (`--mode template`) and project-readiness doctor (`--mode project`).
+- `.ignore`: ripgrep ignore rules excluding `.env*` (except safe templates), private keys, and credential paths from `grep --hidden` directory searches.
+- `scripts/validate_harness.py`: zero-dependency validator (`--mode template`), project-readiness doctor (`--mode project`), and deterministic rule/skill preflight resolver (`--preflight`).
 - `tests/test_validate_harness.py`: automated regression tests for harness configuration, permissions, and rule catalogue integrity.
 - `docs/`: selection, installation, rule loading, and reusable templates.
 

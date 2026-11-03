@@ -22,9 +22,6 @@ permissions:
   - action: edit
     resource: "*"
     effect: deny
-  - action: write
-    resource: "*"
-    effect: deny
   - action: edit
     resource: "src/module-a/**"
     effect: allow

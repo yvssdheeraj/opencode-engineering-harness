@@ -22,9 +22,15 @@ Root `AGENTS.md` contains a routing matrix. The agent identifies affected domain
 
 Conditional loading is an explicit agent procedure. It is not an automatic rule engine that evaluates file paths. The agent must use its read tool to load each referenced document that applies.
 
-## Rule and skill preflight
+## Rule and skill preflight (`.opencode/rules/rule-routing.json`)
 
-Because conditional loading is procedural rather than enforced by a static file-path router, the primary `developer` agent must produce a compact **Rule and Skill Preflight** record before modifying code (see `.opencode/rules/workflow/task-execution.md`):
+To prevent accidental omission of cross-cutting rules (for example forgetting `engineering/security.md` on an authorization or persistence change), `.opencode/rules/rule-routing.json` provides a machine-readable mapping from task domains and file-path globs to required engineering rules, candidate skills, quality gates, and specialist reviewers.
+
+Before modifying code, the primary `developer` agent can run the deterministic preflight resolver (or compute the union from `.opencode/rules/rule-routing.json`) and record the **Rule and Skill Preflight** block (see `.opencode/rules/workflow/task-execution.md`):
+
+```sh
+python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/auth/login.ts db/migrations/V1__init.sql
+```
 
 ```text
 RULE & SKILL PREFLIGHT
@@ -33,9 +39,10 @@ Task domains: <API, database, security, frontend, IaC, etc.>
 Required engineering rules loaded: <exact .opencode/rules/engineering/*.md files>
 Skills loaded: <exact .opencode/skills/<id> names or "none">
 Applicable quality gates: <QG IDs>
+Recommended specialist reviewers: <reviewer agent IDs>
 ```
 
-Recording this preflight makes omitted domains (for example forgetting `engineering/security.md` on an authorization or persistence change) immediately visible during execution and review.
+Recording this preflight makes omitted domains immediately visible during execution and review.
 
 ## Audit the full rule set
 

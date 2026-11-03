@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import collections
 import dataclasses
+import fnmatch
 import json
 import pathlib
 import re
 import shutil
+import subprocess
 import sys
 from typing import Any
 
@@ -29,7 +31,71 @@ EXPECTED_COMMON_RULES = [
     ".opencode/rules/common/collaboration.md",
     ".opencode/rules/common/evidence-and-reporting.md",
 ]
-DEPRECATED_V1_ROOT_KEYS = {"permission", "tools", "agent", "mode"}
+VALID_V2_ROOT_KEYS = {
+    "$schema",
+    "shell",
+    "model",
+    "default_agent",
+    "update",
+    "share",
+    "enterprise",
+    "username",
+    "timezone",
+    "permissions",
+    "policies",
+    "agents",
+    "snapshots",
+    "watcher",
+    "formatter",
+    "lsp",
+    "media",
+    "tool_output",
+    "mcp",
+    "compaction",
+    "skills",
+    "commands",
+    "instructions",
+    "references",
+    "websearch",
+    "plugins",
+    "worktree",
+    "warming",
+    "providers",
+    "experimental",
+    "logLevel",
+    "server",
+}
+DEPRECATED_V1_ROOT_KEYS = {
+    "permission",
+    "tools",
+    "agent",
+    "mode",
+    "command",
+    "reference",
+    "snapshot",
+    "plugin",
+    "autoshare",
+    "autoupdate",
+    "disabled_providers",
+    "enabled_providers",
+    "small_model",
+    "subagent_depth",
+    "provider",
+    "layout",
+    "attachment",
+}
+VALID_V2_AGENT_KEYS = {
+    "description",
+    "mode",
+    "model",
+    "permissions",
+    "steps",
+    "hidden",
+    "color",
+    "disabled",
+    "request",
+    "system",
+}
 DEPRECATED_V1_AGENT_KEYS = {
     "permission",
     "tools",
@@ -39,6 +105,35 @@ DEPRECATED_V1_AGENT_KEYS = {
     "temperature",
     "top_p",
 }
+VALID_V2_PERMISSION_ACTIONS = {
+    "*",
+    "read",
+    "edit",
+    "glob",
+    "grep",
+    "shell",
+    "subagent",
+    "skill",
+    "question",
+    "webfetch",
+    "websearch",
+    "experimental_image_generate",
+    "external_directory",
+    "opencode_list_mcp_resources",
+    "opencode_read_mcp_resource",
+    "execute",
+    "browser",
+}
+DEPRECATED_V1_PERMISSION_ACTIONS = {
+    "write",
+    "patch",
+    "bash",
+    "task",
+    "doom_loop",
+    "lsp",
+    "todowrite",
+}
+MCP_ACTION_PATTERN = re.compile(r"^[a-z0-9]+_[a-z0-9_]+$")
 VALID_EFFECTS = {"allow", "ask", "deny"}
 VALID_AGENT_MODES = {"primary", "subagent", "all"}
 STARTER_TECH_SKILLS = {"postgresql", "spring-boot", "react-typescript", "terraform"}
@@ -51,6 +146,18 @@ REQUIRED_TECH_SKILL_HEADINGS = [
     "## Completion checklist",
     "## References",
 ]
+REQUIRED_IGNORE_PATTERNS = [
+    ".env",
+    ".env.*",
+    "!.env.example",
+    "*.pem",
+    "*.key",
+    ".aws/",
+    ".ssh/",
+    "secrets/",
+    "*credentials*",
+]
+MAX_ALWAYS_ON_ESTIMATED_TOKENS = 7000
 SKILL_ID_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
@@ -266,6 +373,14 @@ def resolve_permission(
     return effect
 
 
+def is_valid_v2_action(action: str) -> bool:
+    if action in DEPRECATED_V1_PERMISSION_ACTIONS:
+        return False
+    if action in VALID_V2_PERMISSION_ACTIONS:
+        return True
+    return bool(MCP_ACTION_PATTERN.match(action))
+
+
 def validate_permission_list(
     rules: Any, source_label: str, findings: list[CheckFinding]
 ) -> list[dict[str, str]]:
@@ -296,6 +411,24 @@ def validate_permission_list(
                     "FAIL",
                     "permissions",
                     f"{source_label} rule #{idx + 1} must have string action/resource and effect in {sorted(VALID_EFFECTS)}.",
+                )
+            )
+            continue
+        if action in DEPRECATED_V1_PERMISSION_ACTIONS:
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "permissions",
+                    f"{source_label} rule #{idx + 1} uses legacy/redundant V1 action {action!r}; in OpenCode V2 'edit' covers edit/write/patch, 'shell' covers bash, and 'subagent' covers task.",
+                )
+            )
+            continue
+        if not is_valid_v2_action(action):
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "permissions",
+                    f"{source_label} rule #{idx + 1} uses unsupported OpenCode V2 permission action {action!r}.",
                 )
             )
             continue
@@ -335,6 +468,16 @@ def check_opencode_config(root: pathlib.Path, findings: list[CheckFinding]) -> d
                 "FAIL",
                 "config",
                 f"opencode.jsonc contains deprecated OpenCode V1 keys: {legacy_keys}. Use V2 'permissions' and 'agents'.",
+            )
+        )
+
+    unknown_root_keys = sorted(set(config.keys()) - VALID_V2_ROOT_KEYS - DEPRECATED_V1_ROOT_KEYS)
+    if unknown_root_keys:
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "config",
+                f"opencode.jsonc contains unknown root keys not in OpenCode V2 schema: {unknown_root_keys}.",
             )
         )
 
@@ -449,6 +592,60 @@ def check_opencode_config(root: pathlib.Path, findings: list[CheckFinding]) -> d
                     )
                 )
 
+        if resolve_permission(rules, "grep", "DEFAULT_TIMEOUT") != "allow":
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "permissions",
+                    "opencode.jsonc must allow normal code grep queries such as 'DEFAULT_TIMEOUT'.",
+                )
+            )
+        for dump_pattern in (".*", ".+", "^.*", "^.+"):
+            dump_eff = resolve_permission(rules, "grep", dump_pattern)
+            if dump_eff not in ("ask", "deny"):
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"opencode.jsonc must guard catch-all grep dump pattern {dump_pattern!r} with 'ask' or 'deny' (resolved to {dump_eff!r}).",
+                    )
+                )
+        for key_pattern in ("-----BEGIN RSA PRIVATE KEY-----", "PRIVATE KEY"):
+            key_eff = resolve_permission(rules, "grep", key_pattern)
+            if key_eff != "deny":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "security",
+                        f"opencode.jsonc must deny grep private-key pattern {key_pattern!r} (resolved to {key_eff!r}).",
+                    )
+                )
+
+    ignore_path = root / ".ignore"
+    if not ignore_path.is_file():
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "security",
+                "Missing root .ignore file to prevent ripgrep (rg --hidden) from indexing secret files during directory searches.",
+            )
+        )
+    else:
+        ignore_lines = {
+            line.strip()
+            for line in ignore_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+        missing_ignore = [pat for pat in REQUIRED_IGNORE_PATTERNS if pat not in ignore_lines]
+        if missing_ignore:
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "security",
+                    f".ignore is missing required ripgrep secret-protection patterns: {missing_ignore}.",
+                )
+            )
+
     if not any(f.level == "FAIL" and f.category in ("config", "security", "permissions") for f in findings):
         findings.append(
             CheckFinding(
@@ -502,6 +699,16 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                     "FAIL",
                     "agents",
                     f"{rel_label} uses deprecated OpenCode V1 frontmatter keys: {legacy_keys}.",
+                )
+            )
+
+        unknown_agent_keys = sorted(set(fm.keys()) - VALID_V2_AGENT_KEYS - DEPRECATED_V1_AGENT_KEYS)
+        if unknown_agent_keys:
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "agents",
+                    f"{rel_label} uses unknown OpenCode V2 frontmatter keys: {unknown_agent_keys}.",
                 )
             )
 
@@ -564,16 +771,15 @@ def check_agents(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                 findings.append(
                     CheckFinding("FAIL", "agents", f"{rel_label} must have mode 'subagent', found {mode!r}.")
                 )
-            for action_name in ("edit", "write"):
-                eff = resolve_permission(rules, action_name, "src/app.py")
-                if eff != "deny":
-                    findings.append(
-                        CheckFinding(
-                            "FAIL",
-                            "agents",
-                            f"Read-only subagent {rel_label} must deny {action_name!r} (resolved to {eff!r}).",
-                        )
+            eff = resolve_permission(rules, "edit", "src/app.py")
+            if eff != "deny":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "agents",
+                        f"Read-only subagent {rel_label} must deny 'edit' (which governs edit/write/patch in V2; resolved to {eff!r}).",
                     )
+                )
             if resolve_permission(rules, "subagent", "explorer") != "deny":
                 findings.append(
                     CheckFinding(
@@ -676,6 +882,14 @@ def check_skills(root: pathlib.Path, findings: list[CheckFinding]) -> set[str]:
                             f"Starter technology skill {rel_label} is missing template section {heading!r}.",
                         )
                     )
+            if not re.search(r"^- Last reviewed:\s*\d{4}-\d{2}\b", body, re.MULTILINE):
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "skills",
+                        f"Starter technology skill {rel_label} is missing '- Last reviewed: YYYY-MM' metadata in Supported scope.",
+                    )
+                )
 
     if not any(f.level == "FAIL" and f.category == "skills" for f in findings):
         findings.append(
@@ -896,6 +1110,380 @@ def check_references(
         )
 
 
+def check_templates(root: pathlib.Path, findings: list[CheckFinding]) -> None:
+    worker_template = root / "docs" / "templates" / "implementation-worker-agent.md"
+    if not worker_template.is_file():
+        findings.append(
+            CheckFinding("FAIL", "templates", "Missing docs/templates/implementation-worker-agent.md.")
+        )
+        return
+
+    text = worker_template.read_text(encoding="utf-8")
+    fenced_match = re.search(r"```markdown\n(---\n.*?)\n```", text, re.DOTALL)
+    if not fenced_match:
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "templates",
+                "docs/templates/implementation-worker-agent.md is missing a fenced ```markdown agent profile.",
+            )
+        )
+        return
+
+    rel_label = "docs/templates/implementation-worker-agent.md"
+    try:
+        fm, body = parse_frontmatter(fenced_match.group(1))
+    except Exception as exc:
+        findings.append(CheckFinding("FAIL", "templates", f"{rel_label} invalid frontmatter: {exc}"))
+        return
+
+    legacy_keys = sorted(DEPRECATED_V1_AGENT_KEYS.intersection(fm.keys()))
+    if legacy_keys:
+        findings.append(
+            CheckFinding("FAIL", "templates", f"{rel_label} uses deprecated V1 frontmatter keys: {legacy_keys}.")
+        )
+    if fm.get("mode") != "subagent":
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "templates",
+                f"{rel_label} must declare mode 'subagent', found {fm.get('mode')!r}.",
+            )
+        )
+    if not body.strip():
+        findings.append(CheckFinding("FAIL", "templates", f"{rel_label} has an empty prompt body."))
+
+    rules = validate_permission_list(fm.get("permissions"), rel_label, findings)
+    if rules:
+        for allowed_path in ("src/module-a/index.ts", "tests/module-a/index.test.ts"):
+            eff = resolve_permission(rules, "edit", allowed_path)
+            if eff != "allow":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "templates",
+                        f"{rel_label} must allow 'edit' on owned path {allowed_path!r} (resolved to {eff!r}).",
+                    )
+                )
+        for denied_path in (
+            "src/module-b/index.ts",
+            "package-lock.json",
+            "AGENTS.md",
+            "opencode.jsonc",
+            "specs/001-feature/spec.md",
+            "db/migrations/001_init.sql",
+        ):
+            eff = resolve_permission(rules, "edit", denied_path)
+            if eff != "deny":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "templates",
+                        f"{rel_label} must deny 'edit' on out-of-scope/shared path {denied_path!r} (resolved to {eff!r}).",
+                    )
+                )
+        if resolve_permission(rules, "subagent", "explorer") != "deny":
+            findings.append(
+                CheckFinding("FAIL", "templates", f"{rel_label} must deny recursive subagent launches.")
+            )
+        if resolve_permission(rules, "shell", "rm -rf /") != "deny":
+            findings.append(
+                CheckFinding("FAIL", "templates", f"{rel_label} must deny arbitrary shell commands.")
+            )
+        if resolve_permission(rules, "shell", "git status --short") != "allow":
+            findings.append(
+                CheckFinding("FAIL", "templates", f"{rel_label} must allow read-only 'git status *'.")
+            )
+
+    if not any(f.level == "FAIL" and f.category == "templates" for f in findings):
+        findings.append(
+            CheckFinding(
+                "PASS",
+                "templates",
+                "docs/templates/implementation-worker-agent.md V2 frontmatter and path-scoped write boundaries verified.",
+            )
+        )
+
+
+def check_rule_routing(
+    root: pathlib.Path,
+    skill_ids: set[str],
+    agent_ids: set[str],
+    findings: list[CheckFinding],
+) -> dict[str, Any] | None:
+    routing_path = root / ".opencode" / "rules" / "rule-routing.json"
+    if not routing_path.is_file():
+        findings.append(
+            CheckFinding("FAIL", "routing", "Missing .opencode/rules/rule-routing.json manifest.")
+        )
+        return None
+
+    try:
+        manifest = json.loads(routing_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        findings.append(CheckFinding("FAIL", "routing", f"Invalid JSON in rule-routing.json: {exc}"))
+        return None
+
+    if not isinstance(manifest, dict):
+        findings.append(CheckFinding("FAIL", "routing", "rule-routing.json root must be an object."))
+        return None
+
+    workflow_rules = manifest.get("always_on_workflow_rules")
+    if not isinstance(workflow_rules, list) or not workflow_rules:
+        findings.append(
+            CheckFinding("FAIL", "routing", "rule-routing.json must define 'always_on_workflow_rules'.")
+        )
+    else:
+        for wf_path in workflow_rules:
+            if not isinstance(wf_path, str) or not (root / wf_path).is_file():
+                findings.append(
+                    CheckFinding("FAIL", "routing", f"rule-routing.json workflow rule missing: {wf_path!r}.")
+                )
+
+    domains = manifest.get("domains")
+    if not isinstance(domains, dict) or not domains:
+        findings.append(CheckFinding("FAIL", "routing", "rule-routing.json must define non-empty 'domains'."))
+        return None
+
+    valid_qg_ids = {f"QG-{i:02d}" for i in range(1, 18)}
+    referenced_eng_rules: set[str] = set()
+
+    for domain_name, spec in domains.items():
+        if not isinstance(spec, dict):
+            findings.append(CheckFinding("FAIL", "routing", f"Domain {domain_name!r} entry must be an object."))
+            continue
+        rules = spec.get("rules", [])
+        if not isinstance(rules, list) or not rules:
+            findings.append(CheckFinding("FAIL", "routing", f"Domain {domain_name!r} must list at least one rule."))
+        else:
+            for r_rel in rules:
+                referenced_eng_rules.add(r_rel)
+                if not (root / ".opencode" / "rules" / r_rel).is_file():
+                    findings.append(
+                        CheckFinding(
+                            "FAIL",
+                            "routing",
+                            f"Domain {domain_name!r} references missing rule '.opencode/rules/{r_rel}'.",
+                        )
+                    )
+        for sk in spec.get("skills", []):
+            if sk not in skill_ids:
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "routing",
+                        f"Domain {domain_name!r} references unknown skill {sk!r}.",
+                    )
+                )
+        for qg in spec.get("quality_gates", []):
+            if qg not in valid_qg_ids:
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "routing",
+                        f"Domain {domain_name!r} references invalid quality gate ID {qg!r}.",
+                    )
+                )
+        for rev in spec.get("reviewers", []):
+            if rev not in agent_ids or rev == "developer":
+                findings.append(
+                    CheckFinding(
+                        "FAIL",
+                        "routing",
+                        f"Domain {domain_name!r} references invalid specialist reviewer {rev!r}.",
+                    )
+                )
+
+    eng_dir = root / ".opencode" / "rules" / "engineering"
+    if eng_dir.is_dir():
+        actual_eng_rules = {f"engineering/{p.name}" for p in eng_dir.glob("*.md")}
+        unrouted = sorted(actual_eng_rules - referenced_eng_rules)
+        if unrouted:
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "routing",
+                    f"Engineering rule files not reachable from any domain in rule-routing.json: {unrouted}.",
+                )
+            )
+
+    if not any(f.level == "FAIL" and f.category == "routing" for f in findings):
+        findings.append(
+            CheckFinding(
+                "PASS",
+                "routing",
+                f"rule-routing.json verified across {len(domains)} domains and all 16 engineering rule files.",
+            )
+        )
+    return manifest
+
+
+def check_context_budget(root: pathlib.Path, findings: list[CheckFinding]) -> None:
+    always_on_paths = [root / "AGENTS.md"] + [root / p for p in EXPECTED_COMMON_RULES]
+    total_chars = 0
+    total_lines = 0
+    for p in always_on_paths:
+        if p.is_file():
+            content = p.read_text(encoding="utf-8")
+            total_chars += len(content)
+            total_lines += len(content.splitlines())
+
+    estimated_tokens = (total_chars + 3) // 4
+    if estimated_tokens > MAX_ALWAYS_ON_ESTIMATED_TOKENS:
+        findings.append(
+            CheckFinding(
+                "FAIL",
+                "context-budget",
+                f"Always-on context (AGENTS.md + 7 common rules) is ~{estimated_tokens} tokens, exceeding budget of {MAX_ALWAYS_ON_ESTIMATED_TOKENS}.",
+            )
+        )
+    else:
+        findings.append(
+            CheckFinding(
+                "PASS",
+                "context-budget",
+                f"Always-on context footprint is {total_lines} lines / ~{estimated_tokens} tokens (within {MAX_ALWAYS_ON_ESTIMATED_TOKENS}-token budget).",
+            )
+        )
+
+
+def _match_path_glob(file_path: str, pattern: str) -> bool:
+    norm_path = file_path.strip("/").replace("\\", "/")
+    norm_pat = pattern.strip("/").replace("\\", "/")
+    if fnmatch.fnmatch(norm_path, norm_pat):
+        return True
+    if norm_pat.startswith("**/") and fnmatch.fnmatch(norm_path, norm_pat[3:]):
+        return True
+    if "/**/" in norm_pat:
+        collapsed = norm_pat.replace("/**/", "/")
+        if fnmatch.fnmatch(norm_path, collapsed):
+            return True
+    return False
+
+
+def compute_preflight(
+    root: pathlib.Path,
+    *,
+    domains: list[str] | None = None,
+    files: list[str] | None = None,
+    stack: str = "<detect from manifests>",
+) -> dict[str, Any]:
+    routing_path = root / ".opencode" / "rules" / "rule-routing.json"
+    manifest = json.loads(routing_path.read_text(encoding="utf-8"))
+    domain_map: dict[str, Any] = manifest["domains"]
+
+    matched_domains: list[str] = []
+    for d in domains or []:
+        d_clean = d.strip().lower()
+        if not d_clean:
+            continue
+        if d_clean not in domain_map:
+            raise ValueError(
+                f"Unknown domain {d_clean!r}. Valid domains: {', '.join(sorted(domain_map.keys()))}"
+            )
+        if d_clean not in matched_domains:
+            matched_domains.append(d_clean)
+
+    for fpath in files or []:
+        for d_name, spec in domain_map.items():
+            for pat in spec.get("path_globs", []):
+                if _match_path_glob(fpath, pat) and d_name not in matched_domains:
+                    matched_domains.append(d_name)
+
+    if not matched_domains:
+        matched_domains.append("application-code")
+
+    rules: list[str] = []
+    skills: list[str] = []
+    quality_gates: list[str] = []
+    reviewers: list[str] = []
+
+    for d_name in matched_domains:
+        spec = domain_map[d_name]
+        for r in spec.get("rules", []):
+            full_r = f".opencode/rules/{r}"
+            if full_r not in rules:
+                rules.append(full_r)
+        for s in spec.get("skills", []):
+            if s not in skills:
+                skills.append(s)
+        for qg in spec.get("quality_gates", []):
+            if qg not in quality_gates:
+                quality_gates.append(qg)
+        for rev in spec.get("reviewers", []):
+            if rev not in reviewers:
+                reviewers.append(rev)
+
+    quality_gates.sort(key=lambda x: int(x.split("-")[1]))
+
+    block_lines = [
+        "RULE & SKILL PREFLIGHT",
+        f"Detected stack & versions: {stack}",
+        f"Task domains: {', '.join(matched_domains)}",
+        f"Required engineering rules loaded: {', '.join(rules) if rules else 'none'}",
+        f"Skills loaded: {', '.join(skills) if skills else 'none'}",
+        f"Applicable quality gates: {', '.join(quality_gates) if quality_gates else 'none'}",
+        f"Recommended specialist reviewers: {', '.join(reviewers) if reviewers else 'none'}",
+    ]
+    return {
+        "stack": stack,
+        "domains": matched_domains,
+        "files": files or [],
+        "always_on_workflow_rules": manifest.get("always_on_workflow_rules", []),
+        "engineering_rules": rules,
+        "skills": skills,
+        "quality_gates": quality_gates,
+        "reviewers": reviewers,
+        "formatted": "\n".join(block_lines),
+    }
+    agents_md = root / "AGENTS.md"
+    if agents_md.is_file():
+        lines = agents_md.read_text(encoding="utf-8").splitlines()
+        todo_lines = [line.strip() for line in lines if re.search(r":\s*TODO\b", line)]
+        if todo_lines:
+            findings.append(
+                CheckFinding(
+                    "FAIL",
+                    "readiness",
+                    f"AGENTS.md still has {len(todo_lines)} unresolved project-specific TODO placeholder(s): {todo_lines}",
+                )
+            )
+        else:
+            findings.append(
+                CheckFinding("PASS", "readiness", "AGENTS.md project-specific facts are populated (no TODOs).")
+            )
+
+    constitution = root / ".specify" / "memory" / "constitution.md"
+    if constitution.is_file():
+        findings.append(CheckFinding("PASS", "readiness", "Found .specify/memory/constitution.md."))
+    else:
+        findings.append(
+            CheckFinding(
+                "WARN",
+                "readiness",
+                "Missing .specify/memory/constitution.md (run '/speckit.constitution' after initializing Spec Kit).",
+            )
+        )
+
+    commands_dir = root / ".opencode" / "commands"
+    if commands_dir.is_dir() and any(commands_dir.iterdir()):
+        findings.append(CheckFinding("PASS", "readiness", "Found Spec Kit commands in .opencode/commands/."))
+    else:
+        findings.append(
+            CheckFinding(
+                "WARN",
+                "readiness",
+                "No Spec Kit command files found in .opencode/commands/ (run 'specify init . --integration opencode' or 'specify integration install opencode').",
+            )
+        )
+
+def _parse_semver(text: str) -> tuple[int, int, int] | None:
+    m = re.search(r"\b(\d+)\.(\d+)\.(\d+)\b", text)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
 def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) -> None:
     agents_md = root / "AGENTS.md"
     if agents_md.is_file():
@@ -938,13 +1526,72 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
             )
         )
 
-    for cli_name in ("opencode", "specify"):
-        resolved = shutil.which(cli_name)
-        if resolved:
-            findings.append(CheckFinding("PASS", "readiness", f"CLI tool {cli_name!r} found at {resolved}."))
-        else:
+    opencode_bin = shutil.which("opencode")
+    if not opencode_bin:
+        findings.append(
+            CheckFinding("WARN", "readiness", "CLI tool 'opencode' is not installed or not on PATH.")
+        )
+    else:
+        try:
+            proc = subprocess.run(
+                [opencode_bin, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            out = (proc.stdout or proc.stderr or "").strip()
+            ver = _parse_semver(out)
+            if ver is not None and ver[0] < 2:
+                findings.append(
+                    CheckFinding(
+                        "WARN",
+                        "readiness",
+                        f"CLI tool 'opencode' at {opencode_bin} reported V1 version {ver[0]}.{ver[1]}.{ver[2]}; this harness targets OpenCode V2.",
+                    )
+                )
+            else:
+                ver_label = f"{ver[0]}.{ver[1]}.{ver[2]}" if ver else (out.splitlines()[0] if out else "unknown")
+                findings.append(
+                    CheckFinding("PASS", "readiness", f"CLI tool 'opencode' found at {opencode_bin} (version: {ver_label}).")
+                )
+        except Exception as exc:
             findings.append(
-                CheckFinding("WARN", "readiness", f"CLI tool {cli_name!r} is not installed or not on PATH.")
+                CheckFinding("WARN", "readiness", f"CLI tool 'opencode' at {opencode_bin} failed version check: {exc}")
+            )
+
+    specify_bin = shutil.which("specify")
+    if not specify_bin:
+        findings.append(
+            CheckFinding("WARN", "readiness", "CLI tool 'specify' is not installed or not on PATH.")
+        )
+    else:
+        try:
+            proc = subprocess.run(
+                [specify_bin, "version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            out = (proc.stdout or proc.stderr or "").strip()
+            ver = _parse_semver(out)
+            if ver is not None and (ver[0], ver[1]) < (1, 2):
+                findings.append(
+                    CheckFinding(
+                        "WARN",
+                        "readiness",
+                        f"CLI tool 'specify' at {specify_bin} reported version {ver[0]}.{ver[1]}.{ver[2]}; Spec Kit >= 1.2.0 is recommended for '/speckit.converge'.",
+                    )
+                )
+            else:
+                ver_label = f"{ver[0]}.{ver[1]}.{ver[2]}" if ver else "detected"
+                findings.append(
+                    CheckFinding("PASS", "readiness", f"CLI tool 'specify' found at {specify_bin} (version: {ver_label}).")
+                )
+        except Exception as exc:
+            findings.append(
+                CheckFinding("WARN", "readiness", f"CLI tool 'specify' at {specify_bin} failed version check: {exc}")
             )
 
 
@@ -956,7 +1603,10 @@ def validate_repository(root: pathlib.Path, *, mode: str = "template") -> list[C
     check_opencode_config(root, findings)
     agent_ids = check_agents(root, findings)
     skill_ids = check_skills(root, findings)
+    check_templates(root, findings)
     check_rule_catalog(root, findings)
+    check_rule_routing(root, skill_ids, agent_ids, findings)
+    check_context_budget(root, findings)
     check_references(root, skill_ids, agent_ids, findings)
     if mode == "project":
         check_project_readiness(root, findings)
@@ -980,12 +1630,53 @@ def main(argv: list[str] | None = None) -> int:
         help="Validation mode: 'template' for the blueprint repo CI; 'project' for adopted project readiness.",
     )
     parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Compute a deterministic Rule & Skill Preflight manifest from .opencode/rules/rule-routing.json.",
+    )
+    parser.add_argument(
+        "--domains",
+        type=str,
+        default="",
+        help="Comma-separated domain names for --preflight (for example: api,database,security).",
+    )
+    parser.add_argument(
+        "--files",
+        nargs="*",
+        default=[],
+        help="Changed or affected file paths for --preflight domain inference.",
+    )
+    parser.add_argument(
+        "--stack",
+        type=str,
+        default="<detect from manifests>",
+        help="Detected stack summary to include in --preflight output.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON output.",
     )
     args = parser.parse_args(argv)
     root = args.root.resolve()
+
+    if args.preflight:
+        domain_list = [d.strip() for d in args.domains.split(",") if d.strip()]
+        try:
+            preflight = compute_preflight(
+                root,
+                domains=domain_list,
+                files=args.files,
+                stack=args.stack,
+            )
+        except Exception as exc:
+            print(f"Preflight error: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(preflight, indent=2))
+        else:
+            print(preflight["formatted"])
+        return 0
 
     findings = validate_repository(root, mode=args.mode)
     failures = [f for f in findings if f.level == "FAIL"]

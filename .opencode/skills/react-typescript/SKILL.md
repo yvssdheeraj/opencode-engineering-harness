@@ -8,9 +8,10 @@ description: Use when modifying a frontend that actually uses React and TypeScri
 ## Supported scope
 
 - Technology and version range: React 18/19+ with TypeScript 5+ (inspect `package.json` and `tsconfig.json` for exact versions, strictness flags, and bundler/framework setup).
+- Last reviewed: 2026-11
 - Runtime/build tooling: Vite, Next.js, Remix/React Router, or custom Webpack/Rspack toolchains via `npm`, `pnpm`, `yarn`, or `bun`.
 - Framework modules covered: components, hooks, client/server state management, forms, routing, accessibility semantics, and client/component testing.
-- Out-of-scope technologies: non-React frontend frameworks (Vue, Angular, Svelte) and backend-only Node.js services.
+- Out-of-scope / unsupported versions: Legacy class-component-only React (< 16.8), non-React frontend frameworks (Vue, Angular, Svelte), and backend-only Node.js services.
 
 ## When to load
 

@@ -7,10 +7,11 @@ description: Use when the affected system uses PostgreSQL and the task changes s
 
 ## Supported scope
 
-- Technology and version range: PostgreSQL 14+ (inspect the repository's actual server version, Docker/Compose manifests, or cloud database config before using version-specific SQL features).
+- Technology and version range: PostgreSQL 14–17+ (inspect the repository's actual server version, Docker/Compose manifests, or cloud database config before using version-specific SQL features).
+- Last reviewed: 2026-11
 - Runtime/build tooling: SQL migrations (Flyway, Liquibase, Alembic, Prisma, Drizzle, Goose, sqitch, or raw SQL) and application query layers.
 - Framework modules covered: relational schema design, DDL migrations, indexing, query plans, transactions/locking, and role/permission boundaries.
-- Out-of-scope technologies: non-PostgreSQL engines and application-specific ORM mapping idioms (load the application framework skill separately).
+- Out-of-scope / unsupported versions: EOL PostgreSQL (< 13) without explicit legacy support requirements; non-PostgreSQL engines and application-specific ORM mapping idioms (load the application framework skill separately).
 
 ## When to load
 
@@ -34,7 +35,9 @@ Load when the affected system uses PostgreSQL and the task changes schemas, SQL 
 ## Testing and verification
 
 - Run forward migrations against a disposable local/containerized PostgreSQL instance and verify schema state and application compatibility.
-- Use `EXPLAIN` (and `EXPLAIN (ANALYZE, BUFFERS)` only in non-production or safe transaction-rolled-back environments) to verify index usage and avoid unexpected sequential scans or N+1 queries.
+- Use `EXPLAIN` (and `EXPLAIN (ANALYZE, BUFFERS)` only in non-production or safe transaction-rolled-back environments) to verify query plans:
+  - Do not assume every `Seq Scan` is a defect; small lookup tables naturally use sequential scans. Flag a `Seq Scan` when `Rows Removed by Filter` is high relative to returned rows or shared buffer reads grow linearly with table size on a hot path.
+  - Verify that new indexes actually appear as `Index Scan`, `Index Only Scan`, or `Bitmap Index Scan` under realistic row counts and parameter types.
 - Test constraint violations, concurrent update races, null/boundary values, and rollback/forward-fix behavior.
 
 ## Completion checklist

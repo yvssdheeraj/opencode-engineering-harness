@@ -1,0 +1,191 @@
+{
+  "version": "1.0",
+  "description": "Machine-readable routing manifest mapping task domains and file-path globs to required engineering rules, candidate skills, quality gates, and specialist reviewers.",
+  "always_on_workflow_rules": [
+    ".opencode/rules/workflow/task-execution.md",
+    ".opencode/rules/workflow/skill-selection.md",
+    ".opencode/rules/workflow/quality-gates.md",
+    ".opencode/rules/workflow/speckit-lifecycle.md"
+  ],
+  "domains": {
+    "application-code": {
+      "description": "Any application source or test code modification",
+      "path_globs": ["src/**", "app/**", "lib/**", "pkg/**", "internal/**", "cmd/**", "services/**", "packages/**"],
+      "rules": [
+        "engineering/coding-standards.md",
+        "engineering/testing.md",
+        "engineering/architecture.md"
+      ],
+      "skills": ["software-engineering", "tdd"],
+      "quality_gates": ["QG-01", "QG-03", "QG-04", "QG-05", "QG-06", "QG-14", "QG-17"],
+      "reviewers": ["code-reviewer"]
+    },
+    "architecture": {
+      "description": "Architecture, module boundaries, cross-cutting design, or major refactoring",
+      "path_globs": ["docs/adr/**", "adr/**", "architecture/**"],
+      "rules": [
+        "engineering/architecture.md",
+        "engineering/coding-standards.md",
+        "engineering/cross-cutting-practices.md"
+      ],
+      "skills": ["software-engineering"],
+      "quality_gates": ["QG-02", "QG-03", "QG-13", "QG-15"],
+      "reviewers": ["architecture-reviewer", "code-reviewer"]
+    },
+    "api": {
+      "description": "HTTP/RPC APIs, service contracts, events, webhooks, or external integrations",
+      "path_globs": ["**/api/**", "**/controllers/**", "**/routes/**", "**/handlers/**", "**/graphql/**", "**/*openapi*.yaml", "**/*openapi*.json", "**/*.proto"],
+      "rules": [
+        "engineering/api-and-integration.md",
+        "engineering/reliability.md",
+        "engineering/security.md",
+        "engineering/observability.md"
+      ],
+      "skills": ["api-design", "tdd"],
+      "quality_gates": ["QG-01", "QG-04", "QG-07", "QG-11", "QG-13", "QG-15"],
+      "reviewers": ["code-reviewer", "security-reviewer"]
+    },
+    "security": {
+      "description": "Authentication, authorization, PII, secrets, cryptography, or trust boundaries",
+      "path_globs": ["**/auth/**", "**/security/**", "**/iam/**", "**/permissions/**", "**/rbac/**", "**/oauth/**", "**/jwt/**"],
+      "rules": [
+        "engineering/security.md"
+      ],
+      "skills": ["security-review"],
+      "quality_gates": ["QG-04", "QG-07", "QG-15"],
+      "reviewers": ["security-reviewer", "code-reviewer"]
+    },
+    "database": {
+      "description": "Database schemas, migrations, queries, indexes, caching, or persistence models",
+      "path_globs": ["**/migrations/**", "**/db/**", "**/schema/**", "**/repositories/**", "**/entities/**", "**/*.sql", "**/prisma/**"],
+      "rules": [
+        "engineering/data-management.md",
+        "engineering/performance.md",
+        "engineering/reliability.md",
+        "engineering/security.md"
+      ],
+      "skills": ["database-engineering", "postgresql"],
+      "quality_gates": ["QG-04", "QG-07", "QG-08", "QG-15"],
+      "reviewers": ["code-reviewer", "test-reviewer"]
+    },
+    "frontend": {
+      "description": "Frontend, web/mobile/desktop UI, components, client state, forms, or accessibility",
+      "path_globs": ["**/components/**", "**/pages/**", "**/views/**", "**/hooks/**", "**/ui/**", "**/*.tsx", "**/*.jsx", "**/*.css"],
+      "rules": [
+        "engineering/frontend.md",
+        "engineering/accessibility-and-ux.md",
+        "engineering/testing.md",
+        "engineering/security.md"
+      ],
+      "skills": ["react-typescript", "tdd"],
+      "quality_gates": ["QG-04", "QG-05", "QG-07", "QG-12", "QG-15"],
+      "reviewers": ["code-reviewer", "test-reviewer"]
+    },
+    "performance": {
+      "description": "Latency, throughput, memory, caching, concurrency, or scale-sensitive paths",
+      "path_globs": ["**/benchmarks/**", "**/perf/**"],
+      "rules": [
+        "engineering/performance.md",
+        "engineering/observability.md",
+        "engineering/reliability.md"
+      ],
+      "skills": ["software-engineering"],
+      "quality_gates": ["QG-04", "QG-11", "QG-15"],
+      "reviewers": ["code-reviewer", "architecture-reviewer"]
+    },
+    "reliability": {
+      "description": "Distributed systems, retries, timeouts, idempotency, queues, or background jobs",
+      "path_globs": ["**/workers/**", "**/jobs/**", "**/queues/**", "**/consumers/**"],
+      "rules": [
+        "engineering/reliability.md",
+        "engineering/api-and-integration.md",
+        "engineering/observability.md",
+        "engineering/testing.md"
+      ],
+      "skills": ["software-engineering", "tdd"],
+      "quality_gates": ["QG-04", "QG-11", "QG-15"],
+      "reviewers": ["code-reviewer", "test-reviewer"]
+    },
+    "infrastructure": {
+      "description": "Cloud resources, Terraform/OpenTofu, containers, networking, or platform IaC",
+      "path_globs": ["**/*.tf", "**/*.tfvars", "**/terraform/**", "**/infra/**", "**/k8s/**", "**/helm/**", "**/Dockerfile*", "**/docker-compose*.yml"],
+      "rules": [
+        "engineering/infrastructure.md",
+        "engineering/security.md",
+        "engineering/reliability.md",
+        "engineering/observability.md"
+      ],
+      "skills": ["terraform", "security-review"],
+      "quality_gates": ["QG-07", "QG-09", "QG-10", "QG-11", "QG-15"],
+      "reviewers": ["infra-reviewer", "security-reviewer"]
+    },
+    "cicd": {
+      "description": "CI/CD pipelines, build scripts, release automation, or deployment workflows",
+      "path_globs": [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile", "**/ci/**", "**/cd/**"],
+      "rules": [
+        "engineering/cicd.md",
+        "engineering/security.md",
+        "engineering/infrastructure.md",
+        "engineering/observability.md"
+      ],
+      "skills": ["security-review"],
+      "quality_gates": ["QG-05", "QG-06", "QG-07", "QG-10", "QG-15"],
+      "reviewers": ["infra-reviewer", "security-reviewer"]
+    },
+    "observability": {
+      "description": "Structured logging, metrics, distributed tracing, health checks, or alerting",
+      "path_globs": ["**/telemetry/**", "**/metrics/**", "**/logging/**", "**/monitoring/**", "**/alerts/**"],
+      "rules": [
+        "engineering/observability.md",
+        "engineering/reliability.md",
+        "engineering/security.md"
+      ],
+      "skills": ["software-engineering"],
+      "quality_gates": ["QG-07", "QG-11", "QG-15"],
+      "reviewers": ["code-reviewer"]
+    },
+    "accessibility": {
+      "description": "Accessibility (WCAG), keyboard navigation, localization/i18n, or UX flows",
+      "path_globs": ["**/i18n/**", "**/locales/**"],
+      "rules": [
+        "engineering/accessibility-and-ux.md",
+        "engineering/frontend.md"
+      ],
+      "skills": ["react-typescript"],
+      "quality_gates": ["QG-01", "QG-04", "QG-12", "QG-15"],
+      "reviewers": ["code-reviewer", "test-reviewer"]
+    },
+    "documentation": {
+      "description": "READMEs, architecture docs, ADRs, API docs, or operational runbooks",
+      "path_globs": ["README.md", "AGENTS.md", "docs/**", "**/*.md"],
+      "rules": [
+        "engineering/documentation.md",
+        "engineering/architecture.md"
+      ],
+      "skills": [],
+      "quality_gates": ["QG-01", "QG-13", "QG-14", "QG-17"],
+      "reviewers": ["code-reviewer"]
+    },
+    "git": {
+      "description": "Git commits, branch hygiene, diff inspection, and review preparation",
+      "path_globs": [".gitignore", ".gitattributes"],
+      "rules": [
+        "engineering/git-and-review.md"
+      ],
+      "skills": [],
+      "quality_gates": ["QG-14", "QG-15", "QG-17"],
+      "reviewers": ["code-reviewer"]
+    },
+    "cross-cutting": {
+      "description": "DDD, Clean Architecture, Design by Contract, or evolutionary design choices",
+      "path_globs": [],
+      "rules": [
+        "engineering/cross-cutting-practices.md",
+        "engineering/architecture.md"
+      ],
+      "skills": ["software-engineering", "bdd-gherkin"],
+      "quality_gates": ["QG-02", "QG-04", "QG-15"],
+      "reviewers": ["architecture-reviewer", "code-reviewer"]
+    }
+  }
+}

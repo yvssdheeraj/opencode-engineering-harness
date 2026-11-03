@@ -8,9 +8,10 @@ description: State the exact language/framework/tool and task types that should 
 ## Supported scope
 
 - Technology and version range:
+- Last reviewed: YYYY-MM
 - Runtime/build tooling:
 - Framework modules covered:
-- Out-of-scope technologies:
+- Out-of-scope / unsupported versions:
 
 ## When to load
 

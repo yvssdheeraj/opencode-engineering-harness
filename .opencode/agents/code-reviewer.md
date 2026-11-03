@@ -5,9 +5,6 @@ permissions:
   - action: edit
     resource: "*"
     effect: deny
-  - action: write
-    resource: "*"
-    effect: deny
   - action: shell
     resource: "*"
     effect: deny

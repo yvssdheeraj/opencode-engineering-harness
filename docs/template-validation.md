@@ -13,6 +13,9 @@ python3 -m unittest discover -s tests -v
 
 # Check project readiness after adopting the harness into a target repository
 python3 scripts/validate_harness.py --mode project
+
+# Compute a deterministic Rule & Skill Preflight manifest from domains and changed files
+python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/api/users.ts db/migrations/001_init.sql
 ```
 
 `--mode project` runs every template integrity check and additionally verifies that `AGENTS.md` `TODO` placeholders have been populated and checks for `.specify/memory/constitution.md`, `.opencode/commands/`, and installed `opencode` / `specify` CLIs.
@@ -31,7 +34,7 @@ python3 scripts/validate_harness.py --mode project
 - [ ] `opencode.jsonc` parses under the installed OpenCode version and schema.
 - [ ] Agent IDs match filenames and referenced subagent permission resources.
 - [ ] `developer` is the intended default primary agent.
-- [ ] Read-only agents deny `edit`/`write`, arbitrary `shell` (allowing only read-only `git status`/`git diff`/`git log`/`git show`), and recursive `subagent` actions using the syntax supported by the installed OpenCode version.
+- [ ] Read-only agents deny `edit` (which covers `edit`, `write`, and `patch` in OpenCode V2), arbitrary `shell` (allowing only read-only `git status *`/`git diff *`/`git log *`/`git show *`), and recursive `subagent` actions using the syntax supported by OpenCode V2.
 - [ ] Shell approvals and web/external access match the team's risk tolerance.
 - [ ] Permission syntax has been checked against the installed OpenCode release; do not mix V1 and V2 configuration formats.
 

@@ -9,7 +9,11 @@
 5. Detect the actual technology stack and versions; load only relevant detailed rules and skills.
 6. Identify applicable quality gates, security risks, compatibility concerns, and potentially destructive side effects.
 7. Delegate only independent discovery/review work with a written contract, bounded permissions, and clear ownership.
-8. Record a concise **Rule and Skill Preflight** before modifying code so conditional rule routing is explicit and auditable:
+8. Record a concise **Rule and Skill Preflight** before modifying code so conditional rule routing is explicit and auditable. You can compute the baseline deterministically from `.opencode/rules/rule-routing.json` by running:
+
+```sh
+python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/api/users.ts
+```
 
 ```text
 RULE & SKILL PREFLIGHT
@@ -18,6 +22,7 @@ Task domains: <for example API, database, security, frontend, IaC>
 Required engineering rules loaded: <exact .opencode/rules/engineering/*.md files>
 Skills loaded: <exact .opencode/skills/<id> names or "none">
 Applicable quality gates: <QG IDs>
+Recommended specialist reviewers: <reviewer agent IDs>
 ```
 
 ## During implementation

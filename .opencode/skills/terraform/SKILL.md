@@ -7,10 +7,11 @@ description: Use when the repository uses Terraform/OpenTofu and a task changes 
 
 ## Supported scope
 
-- Technology and version range: Terraform 1.x+ and OpenTofu 1.6+ (inspect `required_version`, `.terraform.lock.hcl`, and CI workflows for exact CLI and provider versions).
+- Technology and version range: Terraform 1.5+ and OpenTofu 1.6+ (inspect `required_version`, `.terraform.lock.hcl`, and CI workflows for exact CLI and provider versions).
+- Last reviewed: 2026-11
 - Runtime/build tooling: `terraform` / `tofu`, `tflint`, `trivy` / `checkov`, and repository wrapper scripts.
 - Framework modules covered: root configurations, reusable modules, providers, state backends, variables/outputs, IAM/network resources, and plan inspection.
-- Out-of-scope technologies: imperative cloud CLIs, Pulumi, CloudFormation/CDK, or Kubernetes application manifests unless managed via Terraform.
+- Out-of-scope / unsupported versions: Legacy Terraform (< 0.15) syntax, imperative cloud CLIs, Pulumi, CloudFormation/CDK, or Kubernetes application manifests unless managed via Terraform.
 
 ## When to load
 
