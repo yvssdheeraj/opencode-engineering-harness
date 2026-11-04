@@ -5,28 +5,20 @@ This file is the repository-wide entry point for every OpenCode agent.
 ## First principles
 
 - Treat actual repository state and current project documentation as authoritative; detect stack and versions rather than assuming them.
-- Feature artifacts define feature intent; the Spec Kit constitution defines durable project-specific engineering principles.
-- The primary `developer` agent owns feature implementation, integration, final verification, convergence, and reporting.
+- If feature artifacts (spec, plan, tasks) or project principles exist, treat them as the source of feature intent.
+- The primary `developer` agent owns feature implementation, integration, final verification, and reporting.
 - Exploration and review agents (`explorer` and `*-reviewer`) are strictly read-only at the permission layer. Prompt instructions cannot override their `edit`/`write` denials; if bounded parallel implementation is ever required, define a dedicated path-scoped worker agent (`docs/templates/implementation-worker-agent.md`) with explicit file ownership.
-- Preserve user changes and Spec Kit-generated files.
+- Preserve user changes and generated integration files.
 
 ## Always-on instructions
 
-`opencode.jsonc` loads the common operating contract for every agent:
-
-- `.opencode/rules/common/communication.md`
-- `.opencode/rules/common/context-management.md`
-- `.opencode/rules/common/delegation.md`
-- `.opencode/rules/common/tool-use.md`
-- `.opencode/rules/common/autonomy-and-safety.md`
-- `.opencode/rules/common/collaboration.md`
-- `.opencode/rules/common/evidence-and-reporting.md`
+`opencode.jsonc` auto-loads the common operating contract for every agent (communication, context, delegation, tool-use, autonomy, collaboration, evidence).
 
 ## Detailed rule-loading protocol
 
-Before meaningful work, read `.opencode/rules/workflow/task-execution.md`, `.opencode/rules/workflow/skill-selection.md`, and `.opencode/rules/workflow/quality-gates.md`. For Spec Kit work, also read `.opencode/rules/workflow/speckit-lifecycle.md`.
+Before meaningful work, read `.opencode/rules/workflow/task-execution.md`, `.opencode/rules/workflow/skill-selection.md`, and `.opencode/rules/workflow/quality-gates.md`.
 
-Then read the applicable domain rules. `.opencode/rules/rule-routing.json` is the authoritative machine-readable routing manifest (`python3 scripts/validate_harness.py --preflight --domains <domains> --files <paths>`). Classify semantic task domains first, then pass changed file paths as an additional signal. If a task crosses domains, load the union of relevant files.
+Then read the applicable domain rules from the routing table below. If a task crosses domains, load the union of relevant files.
 
 | Task touches | Required detailed rules |
 |---|---|
@@ -59,23 +51,20 @@ The complete numbered index is `.opencode/rules/RULE-CATALOG.md`.
 ## Subagent delegation and mandatory review gates
 The primary `developer` agent is the single write-owner by default; `explorer` and all `*-reviewer` agents are strictly read-only and advisory. Use `.opencode/rules/common/delegation.md` and `docs/templates/delegation-contract.md` when delegating bounded tasks:
 
-- **Discovery (`explorer`):** Delegate bounded codebase fact-finding during `/speckit.specify`, `/speckit.plan`, or `/speckit.analyze` to avoid flooding primary context.
-- **Architecture review (`architecture-reviewer`):** Delegate before accepting `/speckit.plan` on cross-cutting features or module-boundary changes, and optionally after implementation.
-- **Security review (`security-reviewer`):** Delegate during `/speckit.plan` and after `/speckit.implement` whenever work touches authentication, authorization, PII, secrets, or trust boundaries.
-- **Test review (`test-reviewer`):** Delegate during `/speckit.tasks` or after `/speckit.implement` for complex workflows, safety-critical logic, or high regression risk.
+- **Discovery (`explorer`):** Delegate bounded codebase fact-finding to avoid flooding primary context.
+- **Architecture review (`architecture-reviewer`):** Delegate for cross-cutting features or module-boundary changes, before accepting the plan and optionally after implementation.
+- **Security review (`security-reviewer`):** Delegate whenever work touches authentication, authorization, PII, secrets, or trust boundaries.
+- **Test review (`test-reviewer`):** Delegate for complex workflows, safety-critical logic, or high regression risk.
 - **Infrastructure review (`infra-reviewer`):** Delegate before and after preparing IaC, container, CI/CD, or deployment changes.
-- **Code review (`code-reviewer`):** Delegate after a coherent implementation diff exists and relevant tests pass, and repeat after material fixes before final convergence.
+- **Code review (`code-reviewer`):** Delegate after a coherent implementation diff exists and relevant tests pass, and repeat after material fixes.
 - **When NOT to delegate:** Never delegate one-line changes, trivial renames, typo fixes, or tightly coupled edits where delegation overhead exceeds the work.
 
-## Spec Kit integration
+## External integrations (optional)
 
-- Spec Kit owns specification, plan, task, analysis, implementation orchestration, and convergence artifacts/commands.
-- Keep the primary `developer` selected for `/speckit.*` command unless project-specific integration guidance says otherwise.
-- Use specialists for bounded discovery or review; do not let several agents edit the same Spec Kit artifact concurrently.
-- Preserve Spec Kit-generated `.opencode/commands/` and integration event/plugin configuration.
-- Do not shadow or recreate existing `/speckit.*` commands.
-- Use the installed command syntax shown by the current integration; these commands are invoked in OpenCode chat, not assumed shell commands.
-- Do not mark tasks complete or claim convergence without actual implementation and evidence.
+- If feature artifacts (spec, plan, tasks) or generated command integrations (for example `.opencode/commands/`, `.specify/`, `specs/`) exist, treat them as read-only inputs unless the owning workflow explicitly says to update them.
+- Do not shadow or recreate existing slash commands.
+- Preserve generated integration configuration.
+- Do not mark tasks complete without actual implementation and evidence.
 
 ## Project-specific facts to maintain
 

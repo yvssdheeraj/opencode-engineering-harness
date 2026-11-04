@@ -29,8 +29,5 @@ jobs:
       - name: Run harness validator (template mode)
         run: python3 scripts/validate_harness.py --mode template
 
-      - name: Run deterministic preflight smoke check
-        run: python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/api/users.ts db/migrations/001_init.sql
-
       - name: Run validator unit tests
         run: python3 -m unittest discover -s tests -v

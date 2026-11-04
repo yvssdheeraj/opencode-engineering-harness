@@ -4,17 +4,7 @@ OpenCode combines repository instructions (`AGENTS.md`) and configured instructi
 
 ## Always loaded for every agent
 
-`opencode.jsonc` lists the seven shared common files:
-
-- `common/communication.md` — COM-01–COM-10
-- `common/context-management.md` — CTX-01–CTX-12
-- `common/delegation.md` — DEL-01–DEL-15
-- `common/tool-use.md` — TOOL-01–TOOL-10
-- `common/autonomy-and-safety.md` — AUTO-01–AUTO-10
-- `common/collaboration.md` — COL-01–COL-10
-- `common/evidence-and-reporting.md` — EVID-01–EVID-10
-
-These rules govern how all agents communicate, manage context, delegate, use tools, make decisions, collaborate, and report evidence.
+`opencode.jsonc` auto-loads the seven shared common rule files (communication, context-management, delegation, tool-use, autonomy-and-safety, collaboration, evidence-and-reporting). These govern how all agents communicate, manage context, delegate, use tools, make decisions, collaborate, and report evidence. See `opencode.jsonc` for the authoritative list.
 
 ## Loaded conditionally
 
@@ -22,29 +12,11 @@ Root `AGENTS.md` contains a routing matrix. The agent identifies affected domain
 
 Conditional loading is an explicit agent procedure. It is not an automatic rule engine that evaluates file paths. The agent must use its read tool to load each referenced document that applies.
 
-## Rule and skill preflight (`.opencode/rules/rule-routing.json`)
+## Selecting rules and skills
 
-`.opencode/rules/rule-routing.json` is the single machine-readable source of truth mapping task domains and file-path globs to required engineering rules, candidate skills, quality gates, and specialist reviewers (`scripts/validate_harness.py` verifies that `AGENTS.md` and `rule-routing.json` stay synchronized).
+Root `AGENTS.md` contains the routing table. The agent identifies affected domains and reads the corresponding detailed `.opencode/rules/engineering/*.md` files and workflow files before planning, implementation, or review.
 
-Always classify **semantic task domains** (`--domains`) first—because a change in a generic path like `src/user_service.py` can still affect `security`, `database`, or `performance`—and pass changed file paths (`--files`) as an additional safety net:
-
-```sh
-python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/auth/login.ts db/migrations/V1__init.sql
-# Machine-readable JSON output:
-python3 scripts/validate_harness.py --preflight --json --domains api,database,security --files src/auth/login.ts
-```
-
-```text
-RULE & SKILL PREFLIGHT
-Detected stack & versions: <languages, frameworks, build/test tools>
-Task domains: <API, database, security, frontend, IaC, etc.>
-Required engineering rules loaded: <exact .opencode/rules/engineering/*.md files>
-Skills loaded: <exact .opencode/skills/<id> names or "none">
-Applicable quality gates: <QG IDs>
-Recommended specialist reviewers: <reviewer agent IDs>
-```
-
-Recording this preflight makes omitted domains immediately visible during execution and review.
+Conditional loading is an explicit agent procedure. It is not an automatic rule engine. The agent must use its read tool to load each referenced document that applies. Record the selected rules, skills, quality gates, and reviewers in a short `Selected rules & skills` note so omitted domains are visible during execution and review.
 
 ## Audit the full rule set
 
@@ -79,8 +51,8 @@ Skills under `.opencode/skills/<name>/SKILL.md` are discovered by OpenCode and l
 
 - Common rules define shared agent conduct.
 - Engineering rules define reusable stack-neutral practices.
-- Spec Kit constitution defines concise, durable, project-specific principles.
-- Feature specification defines required feature behavior and acceptance criteria.
+- Project principles define concise, durable, project-specific principles (if present).
+- Feature requirements define required behavior and acceptance criteria.
 - Technology skills define language/framework/platform implementation guidance.
 - Agent prompt defines individual role and scope.
 - Tool permissions define what an agent can actually do.

@@ -169,34 +169,5 @@ class ValidateHarnessTests(unittest.TestCase):
             f"Expected worker template scope escape to fail, got: {tpl_failures}",
         )
 
-    def test_deterministic_preflight_resolves_domains_and_file_globs(self) -> None:
-        result = validate_harness.compute_preflight(
-            REPO_ROOT,
-            domains=["api"],
-            files=["db/migrations/V1__users.sql", "src/auth/jwt.ts"],
-            stack="Spring Boot 3.3, PostgreSQL 16",
-        )
-        self.assertEqual(result["domains"], ["api", "database", "application-code", "security"])
-        self.assertIn(".opencode/rules/engineering/security.md", result["engineering_rules"])
-        self.assertIn(".opencode/rules/engineering/data-management.md", result["engineering_rules"])
-        self.assertIn(".opencode/rules/engineering/api-and-integration.md", result["engineering_rules"])
-        self.assertIn("spring-boot", result["skills"])
-        self.assertIn("postgresql", result["skills"])
-        self.assertIn("security-reviewer", result["reviewers"])
-        self.assertIn("QG-07", result["quality_gates"])
-        self.assertIn("QG-08", result["quality_gates"])
-
-        # Verify README.md + main.go loads both documentation and application-code, and specs/** does not trigger docs
-        mixed = validate_harness.compute_preflight(
-            REPO_ROOT,
-            domains=[],
-            files=["README.md", "main.go", "specs/001-auth/tasks.md"],
-            stack="Vue + MySQL",
-        )
-        self.assertEqual(mixed["domains"], ["documentation", "application-code"])
-        self.assertNotIn("postgresql", mixed["skills"])
-        self.assertNotIn("react-typescript", mixed["skills"])
-
-
 if __name__ == "__main__":
     unittest.main()

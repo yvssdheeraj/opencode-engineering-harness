@@ -6,7 +6,7 @@ State one bounded outcome.
 
 ## Feature/task context
 
-- Spec Kit feature directory:
+- Feature directory (if applicable):
 - Task ID:
 - Acceptance criteria:
 - Relevant decisions/constraints:

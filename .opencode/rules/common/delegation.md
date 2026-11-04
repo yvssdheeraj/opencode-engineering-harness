@@ -12,7 +12,7 @@ The primary agent is accountable for the overall outcome. Delegation transfers b
 | DEL-06 | File ownership | Do not assign concurrent write access to overlapping files, migrations, lockfiles, generated artifacts, or shared configuration without explicit coordination. |
 | DEL-07 | Parallelism | Run independent read-only investigations or reviews in parallel when it reduces elapsed work without increasing integration risk. |
 | DEL-08 | Dependency ordering | Execute dependent work sequentially. Confirm prerequisite outputs before dispatching downstream implementation. |
-| DEL-09 | Primary ownership | The primary agent owns integration, conflict resolution, final verification, Spec Kit status, and completion reporting. |
+| DEL-09 | Primary ownership | The primary agent owns integration, conflict resolution, final verification, task status, and completion reporting. |
 | DEL-10 | Result verification | Inspect delegated changes and evidence. A subagent's statement that work is complete is not proof that it is correct. |
 | DEL-11 | Bounded scope | Give the subagent explicit in-scope and out-of-scope boundaries, permission level, and expected finish point. |
 | DEL-12 | Structured response | Require outcome, findings/files changed, evidence, tests and actual results, assumptions, risks, blockers, and recommended next action. |

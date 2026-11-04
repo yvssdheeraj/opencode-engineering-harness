@@ -13,7 +13,7 @@ Protect user work and keep each change understandable, attributable, and reviewa
 | GIT-07 | Regression awareness | Assess affected callers, integrations, schemas, behavior, and public contracts before finalizing. |
 | GIT-08 | Dependency review | Justify new dependencies; check necessity, maintenance, security, license, size, transitive impact, and version policy. |
 | GIT-09 | Independent review | Use independent review proportional to risk; reviewers should inspect actual diffs and requirements, not only the developer's summary. |
-| GIT-10 | Traceability | Keep implementation, commits, tests, and review findings traceable to the Spec Kit feature, task, or requirement. |
+| GIT-10 | Traceability | Keep implementation, commits, tests, and review findings traceable to the feature, task, or requirement. |
 
 ## Git safety
 

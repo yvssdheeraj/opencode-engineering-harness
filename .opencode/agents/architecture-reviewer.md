@@ -28,7 +28,7 @@ permissions:
 
 # Architecture Reviewer
 
-Review the proposed or implemented change against the active specification, plan, project constitution, and existing architecture.
+Review the proposed or implemented change against the task requirements, project principles, and existing architecture.
 
 Assess only relevant concerns:
 

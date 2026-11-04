@@ -42,7 +42,6 @@ This index maps every numbered requirement discussed for the agent framework to 
 | QG-01–QG-17 | Quality gates / definition of done | `workflow/quality-gates.md` |
 | SKILLSEL | Technology and domain skill selection | `workflow/skill-selection.md` |
 | Task workflow | Before/during/after implementation | `workflow/task-execution.md` |
-| Spec Kit lifecycle | Spec Kit stage-to-agent mapping | `workflow/speckit-lifecycle.md` |
 
 ## Applicability
 

@@ -25,7 +25,6 @@ Verification:
 Not run / not verified:
 Review findings and disposition:
 Outstanding issues / risks:
-Spec Kit convergence status:
 ```
 
-Do not mark a Spec Kit task complete until the corresponding implementation and applicable verification have been completed. Report the exact convergence status; do not infer it.
+Do not mark a task complete until the corresponding implementation and applicable verification have been completed.

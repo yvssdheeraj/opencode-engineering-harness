@@ -13,9 +13,6 @@ python3 -m unittest discover -s tests -v
 
 # Check project readiness after adopting the harness into a target repository
 python3 scripts/validate_harness.py --mode project
-
-# Compute a deterministic Rule & Skill Preflight manifest from domains and changed files
-python3 scripts/validate_harness.py --preflight --domains api,database,security --files src/api/users.ts db/migrations/001_init.sql
 ```
 
 `--mode project` runs every template integrity check and additionally verifies that `AGENTS.md` `TODO` placeholders have been populated and checks for `.specify/memory/constitution.md`, `.opencode/commands/`, and installed `opencode` / `specify` CLIs.

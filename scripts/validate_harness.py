@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import collections
 import dataclasses
-import fnmatch
 import json
 import pathlib
 import re
@@ -1138,155 +1137,6 @@ def check_templates(
         )
 
 
-def check_rule_routing(
-    root: pathlib.Path,
-    skill_ids: set[str],
-    agent_ids: set[str],
-    findings: list[CheckFinding],
-) -> dict[str, Any] | None:
-    routing_path = root / ".opencode" / "rules" / "rule-routing.json"
-    if not routing_path.is_file():
-        findings.append(
-            CheckFinding("FAIL", "routing", "Missing .opencode/rules/rule-routing.json manifest.")
-        )
-        return None
-
-    try:
-        manifest = json.loads(routing_path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        findings.append(CheckFinding("FAIL", "routing", f"Invalid JSON in rule-routing.json: {exc}"))
-        return None
-
-    if not isinstance(manifest, dict):
-        findings.append(CheckFinding("FAIL", "routing", "rule-routing.json root must be an object."))
-        return None
-
-    expected_always_on_wf = [
-        ".opencode/rules/workflow/task-execution.md",
-        ".opencode/rules/workflow/skill-selection.md",
-        ".opencode/rules/workflow/quality-gates.md",
-    ]
-    workflow_rules = manifest.get("always_on_workflow_rules")
-    if workflow_rules != expected_always_on_wf:
-        findings.append(
-            CheckFinding(
-                "FAIL",
-                "routing",
-                f"rule-routing.json 'always_on_workflow_rules' must be {expected_always_on_wf} (Spec Kit lifecycle is conditional); found {workflow_rules!r}.",
-            )
-        )
-    else:
-        for wf_path in workflow_rules:
-            if not (root / wf_path).is_file():
-                findings.append(
-                    CheckFinding("FAIL", "routing", f"rule-routing.json workflow rule missing: {wf_path!r}.")
-                )
-
-    speckit_wf = manifest.get("speckit_workflow_rules")
-    if speckit_wf != [".opencode/rules/workflow/speckit-lifecycle.md"] or not (
-        root / ".opencode/rules/workflow/speckit-lifecycle.md"
-    ).is_file():
-        findings.append(
-            CheckFinding(
-                "FAIL",
-                "routing",
-                "rule-routing.json must list '.opencode/rules/workflow/speckit-lifecycle.md' under 'speckit_workflow_rules'.",
-            )
-        )
-
-    domains = manifest.get("domains")
-    if not isinstance(domains, dict) or not domains:
-        findings.append(CheckFinding("FAIL", "routing", "rule-routing.json must define non-empty 'domains'."))
-        return None
-
-    valid_qg_ids = {f"QG-{i:02d}" for i in range(1, 18)}
-    referenced_eng_rules: set[str] = set()
-
-    for domain_name, spec in domains.items():
-        if not isinstance(spec, dict):
-            findings.append(CheckFinding("FAIL", "routing", f"Domain {domain_name!r} entry must be an object."))
-            continue
-        rules = spec.get("rules", [])
-        if not isinstance(rules, list) or not rules:
-            findings.append(CheckFinding("FAIL", "routing", f"Domain {domain_name!r} must list at least one rule."))
-        else:
-            for r_rel in rules:
-                referenced_eng_rules.add(r_rel)
-                if not (root / ".opencode" / "rules" / r_rel).is_file():
-                    findings.append(
-                        CheckFinding(
-                            "FAIL",
-                            "routing",
-                            f"Domain {domain_name!r} references missing rule '.opencode/rules/{r_rel}'.",
-                        )
-                    )
-        for sk in spec.get("skills", []):
-            if sk not in skill_ids:
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "routing",
-                        f"Domain {domain_name!r} references missing skill {sk!r}.",
-                    )
-                )
-        for qg in spec.get("quality_gates", []):
-            if qg not in valid_qg_ids:
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "routing",
-                        f"Domain {domain_name!r} references invalid quality gate ID {qg!r}.",
-                    )
-                )
-        for rev in spec.get("reviewers", []):
-            if rev not in agent_ids or rev == "developer":
-                findings.append(
-                    CheckFinding(
-                        "FAIL",
-                        "routing",
-                        f"Domain {domain_name!r} references invalid specialist reviewer {rev!r}.",
-                    )
-                )
-
-    eng_dir = root / ".opencode" / "rules" / "engineering"
-    if eng_dir.is_dir():
-        actual_eng_rules = {f"engineering/{p.name}" for p in eng_dir.glob("*.md")}
-        unrouted = sorted(actual_eng_rules - referenced_eng_rules)
-        if unrouted:
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "routing",
-                    f"Engineering rule files not reachable from any domain in rule-routing.json: {unrouted}.",
-                )
-            )
-
-    agents_md_path = root / "AGENTS.md"
-    if agents_md_path.is_file():
-        agents_eng_refs = set(
-            re.findall(r"`(engineering/[a-z0-9-]+\.md)`", agents_md_path.read_text(encoding="utf-8"))
-        )
-        if agents_eng_refs != referenced_eng_rules:
-            diff_a = sorted(agents_eng_refs - referenced_eng_rules)
-            diff_b = sorted(referenced_eng_rules - agents_eng_refs)
-            findings.append(
-                CheckFinding(
-                    "FAIL",
-                    "routing",
-                    f"AGENTS.md routing table and rule-routing.json disagree on engineering rules (only_in_agents_md={diff_a}, only_in_json={diff_b}).",
-                )
-            )
-
-    if not any(f.level == "FAIL" and f.category == "routing" for f in findings):
-        findings.append(
-            CheckFinding(
-                "PASS",
-                "routing",
-                f"rule-routing.json verified across {len(domains)} domains and all 16 engineering rule files.",
-            )
-        )
-    return manifest
-
 
 def check_context_budget(root: pathlib.Path, findings: list[CheckFinding]) -> None:
     always_on_paths = [root / "AGENTS.md"] + [root / p for p in EXPECTED_COMMON_RULES]
@@ -1316,129 +1166,6 @@ def check_context_budget(root: pathlib.Path, findings: list[CheckFinding]) -> No
             )
         )
 
-
-def _match_path_glob(file_path: str, pattern: str) -> bool:
-    norm_path = file_path.strip("/").replace("\\", "/")
-    norm_pat = pattern.strip("/").replace("\\", "/")
-    if fnmatch.fnmatch(norm_path, norm_pat):
-        return True
-    if norm_pat.startswith("**/") and fnmatch.fnmatch(norm_path, norm_pat[3:]):
-        return True
-    if "/**/" in norm_pat:
-        collapsed = norm_pat.replace("/**/", "/")
-        if fnmatch.fnmatch(norm_path, collapsed):
-            return True
-    return False
-
-
-def compute_preflight(
-    root: pathlib.Path,
-    *,
-    domains: list[str] | None = None,
-    files: list[str] | None = None,
-    stack: str = "<detect from manifests>",
-) -> dict[str, Any]:
-    routing_path = root / ".opencode" / "rules" / "rule-routing.json"
-    manifest = json.loads(routing_path.read_text(encoding="utf-8"))
-    domain_map: dict[str, Any] = manifest["domains"]
-
-    matched_domains: list[str] = []
-    for d in domains or []:
-        d_clean = d.strip().lower()
-        if not d_clean:
-            continue
-        if d_clean not in domain_map:
-            raise ValueError(
-                f"Unknown domain {d_clean!r}. Valid domains: {', '.join(sorted(domain_map.keys()))}"
-            )
-        if d_clean not in matched_domains:
-            matched_domains.append(d_clean)
-
-    for fpath in files or []:
-        norm_f = fpath.strip("/").replace("\\", "/")
-        if norm_f.startswith(("specs/", ".specify/")):
-            continue
-        file_matched_any = False
-        for d_name, spec in domain_map.items():
-            for pat in spec.get("path_globs", []):
-                if _match_path_glob(norm_f, pat):
-                    file_matched_any = True
-                    if d_name not in matched_domains:
-                        matched_domains.append(d_name)
-        if not file_matched_any and "application-code" not in matched_domains:
-            matched_domains.append("application-code")
-
-    if not matched_domains:
-        matched_domains.append("application-code")
-
-    rules: list[str] = []
-    skills: list[str] = []
-    quality_gates: list[str] = []
-    reviewers: list[str] = []
-
-    for d_name in matched_domains:
-        spec = domain_map[d_name]
-        for r in spec.get("rules", []):
-            full_r = f".opencode/rules/{r}"
-            if full_r not in rules:
-                rules.append(full_r)
-        for s in spec.get("skills", []):
-            if s not in skills:
-                skills.append(s)
-        for qg in spec.get("quality_gates", []):
-            if qg not in quality_gates:
-                quality_gates.append(qg)
-        for rev in spec.get("reviewers", []):
-            if rev not in reviewers:
-                reviewers.append(rev)
-
-    # Dynamically discover installed technology skills in .opencode/skills/
-    skills_dir = root / ".opencode" / "skills"
-    installed_tech_skills: list[str] = []
-    if skills_dir.is_dir():
-        stack_lower = stack.lower()
-        has_explicit_stack = stack != "<detect from manifests>" and bool(stack.strip())
-        for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
-            sid = skill_md.parent.name
-            installed_tech_skills.append(sid)
-            if has_explicit_stack:
-                tokens = [t for t in sid.split("-") if len(t) >= 3]
-                if any(t in stack_lower for t in tokens) and sid not in skills:
-                    skills.append(sid)
-            else:
-                if (
-                    ("database" in matched_domains and sid == "postgresql")
-                    or (("frontend" in matched_domains or "accessibility" in matched_domains) and sid == "react-typescript")
-                    or ("infrastructure" in matched_domains and sid == "terraform")
-                    or (("application-code" in matched_domains or "api" in matched_domains) and sid == "spring-boot")
-                ) and sid not in skills:
-                    skills.append(sid)
-
-    quality_gates.sort(key=lambda x: int(x.split("-")[1]))
-
-    block_lines = [
-        "RULE & SKILL PREFLIGHT",
-        f"Detected stack & versions: {stack}",
-        f"Task domains: {', '.join(matched_domains)}",
-        f"Required engineering rules loaded: {', '.join(rules) if rules else 'none'}",
-        f"Skills loaded: {', '.join(skills) if skills else 'none'}",
-        f"Installed technology skills available: {', '.join(installed_tech_skills) if installed_tech_skills else 'none'}",
-        f"Applicable quality gates: {', '.join(quality_gates) if quality_gates else 'none'}",
-        f"Recommended specialist reviewers: {', '.join(reviewers) if reviewers else 'none'}",
-    ]
-    return {
-        "stack": stack,
-        "domains": matched_domains,
-        "files": files or [],
-        "always_on_workflow_rules": manifest.get("always_on_workflow_rules", []),
-        "speckit_workflow_rules": manifest.get("speckit_workflow_rules", []),
-        "engineering_rules": rules,
-        "skills": skills,
-        "installed_technology_skills": installed_tech_skills,
-        "quality_gates": quality_gates,
-        "reviewers": reviewers,
-        "formatted": "\n".join(block_lines),
-    }
 
 
 def _parse_semver(text: str) -> tuple[int, int, int] | None:
@@ -1614,7 +1341,6 @@ def validate_repository(root: pathlib.Path, *, mode: str = "template") -> list[C
     skill_ids = check_skills(root, findings)
     check_templates(root, global_rules, findings)
     check_rule_catalog(root, findings)
-    check_rule_routing(root, skill_ids, agent_ids, findings)
     check_context_budget(root, findings)
     check_references(root, skill_ids, agent_ids, findings)
     if mode == "project":
@@ -1639,53 +1365,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Validation mode: 'template' for the blueprint repo CI; 'project' for adopted project readiness.",
     )
     parser.add_argument(
-        "--preflight",
-        action="store_true",
-        help="Compute a deterministic Rule & Skill Preflight manifest from .opencode/rules/rule-routing.json.",
-    )
-    parser.add_argument(
-        "--domains",
-        type=str,
-        default="",
-        help="Comma-separated domain names for --preflight (for example: api,database,security).",
-    )
-    parser.add_argument(
-        "--files",
-        nargs="*",
-        default=[],
-        help="Changed or affected file paths for --preflight domain inference.",
-    )
-    parser.add_argument(
-        "--stack",
-        type=str,
-        default="<detect from manifests>",
-        help="Detected stack summary to include in --preflight output.",
-    )
-    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON output.",
     )
     args = parser.parse_args(argv)
     root = args.root.resolve()
-
-    if args.preflight:
-        domain_list = [d.strip() for d in args.domains.split(",") if d.strip()]
-        try:
-            preflight = compute_preflight(
-                root,
-                domains=domain_list,
-                files=args.files,
-                stack=args.stack,
-            )
-        except Exception as exc:
-            print(f"Preflight error: {exc}", file=sys.stderr)
-            return 1
-        if args.json:
-            print(json.dumps(preflight, indent=2))
-        else:
-            print(preflight["formatted"])
-        return 0
 
     findings = validate_repository(root, mode=args.mode)
     failures = [f for f in findings if f.level == "FAIL"]

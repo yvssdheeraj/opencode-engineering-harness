@@ -19,7 +19,7 @@ Quality gates are conditional on the change. The developer must identify which a
 | QG-13 | Documentation | Relevant README, API docs, ADRs, configuration, runbooks, and feature artifacts are updated. |
 | QG-14 | Git hygiene | Final diff is inspected and unrelated user changes are preserved. |
 | QG-15 | Independent review | Appropriate specialist reviews are completed for the risk profile; material findings are resolved or explicitly accepted by an authorized owner. |
-| QG-16 | Spec Kit convergence | Convergence is executed and its exact reported status is recorded; generated gaps are addressed or disclosed. |
+| QG-16 | Feature completeness | All scoped requirements/tasks are implemented or disclosed; generated follow-ups are addressed or disclosed. |
 | QG-17 | Final report | Changed files, commands/results, skipped checks, limitations, blockers, and risks are reported honestly. |
 
 A green unit-test suite is not proof of integration, security, performance, accessibility, deployment, or operational correctness. Do not claim a gate passed without evidence.
