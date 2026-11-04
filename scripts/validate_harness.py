@@ -4,7 +4,7 @@
 Modes:
   --mode template (default): Validates the blueprint repository itself (CI gate).
   --mode project           : Runs all template checks plus adopter readiness checks
-                             (AGENTS.md TODO placeholders, Spec Kit constitution, CLIs).
+                             (AGENTS.md TODO placeholders, duplicate config check, OpenCode CLI).
 """
 
 from __future__ import annotations
@@ -1198,41 +1198,7 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
             CheckFinding(
                 "WARN",
                 "readiness",
-                "Both opencode.json and opencode.jsonc exist in the repository root; merge any Spec Kit plugin/event keys into opencode.jsonc and remove the duplicate file.",
-            )
-        )
-
-    constitution = root / ".specify" / "memory" / "constitution.md"
-    if constitution.is_file():
-        const_text = constitution.read_text(encoding="utf-8")
-        if "[PROJECT_NAME]" in const_text or "[PRINCIPLE_1_NAME]" in const_text:
-            findings.append(
-                CheckFinding(
-                    "WARN",
-                    "readiness",
-                    ".specify/memory/constitution.md still contains unfilled template placeholders ([PROJECT_NAME]); run '/speckit.constitution' to tailor it.",
-                )
-            )
-        else:
-            findings.append(CheckFinding("PASS", "readiness", "Found tailored .specify/memory/constitution.md."))
-    else:
-        findings.append(
-            CheckFinding(
-                "WARN",
-                "readiness",
-                "Missing .specify/memory/constitution.md (run '/speckit.constitution' after initializing Spec Kit).",
-            )
-        )
-
-    commands_dir = root / ".opencode" / "commands"
-    if commands_dir.is_dir() and any(commands_dir.iterdir()):
-        findings.append(CheckFinding("PASS", "readiness", "Found Spec Kit commands in .opencode/commands/."))
-    else:
-        findings.append(
-            CheckFinding(
-                "WARN",
-                "readiness",
-                "No Spec Kit command files found in .opencode/commands/ (run 'specify init . --integration opencode' or 'specify integration install opencode').",
+                "Both opencode.json and opencode.jsonc exist in the repository root; merge their keys into one config file and remove the duplicate.",
             )
         )
 
@@ -1276,48 +1242,6 @@ def check_project_readiness(root: pathlib.Path, findings: list[CheckFinding]) ->
         except Exception as exc:
             findings.append(
                 CheckFinding("WARN", "readiness", f"CLI tool 'opencode' at {opencode_bin} failed version check: {exc}")
-            )
-
-    specify_bin = shutil.which("specify")
-    if not specify_bin:
-        findings.append(
-            CheckFinding("WARN", "readiness", "CLI tool 'specify' is not installed or not on PATH.")
-        )
-    else:
-        try:
-            proc = subprocess.run(
-                [specify_bin, "version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-            out = (proc.stdout or proc.stderr or "").strip()
-            ver = _parse_semver(out)
-            if proc.returncode != 0:
-                findings.append(
-                    CheckFinding(
-                        "WARN",
-                        "readiness",
-                        f"CLI tool 'specify version' exited with non-zero status {proc.returncode}: {out[:120]!r}",
-                    )
-                )
-            elif ver is not None and (ver[0], ver[1]) < (1, 2):
-                findings.append(
-                    CheckFinding(
-                        "WARN",
-                        "readiness",
-                        f"CLI tool 'specify' at {specify_bin} reported version {ver[0]}.{ver[1]}.{ver[2]}; Spec Kit >= 1.2.0 is recommended for '/speckit.converge'.",
-                    )
-                )
-            else:
-                ver_label = f"{ver[0]}.{ver[1]}.{ver[2]}" if ver else "detected"
-                findings.append(
-                    CheckFinding("PASS", "readiness", f"CLI tool 'specify' found at {specify_bin} (version: {ver_label}).")
-                )
-        except Exception as exc:
-            findings.append(
-                CheckFinding("WARN", "readiness", f"CLI tool 'specify' at {specify_bin} failed version check: {exc}")
             )
 
 

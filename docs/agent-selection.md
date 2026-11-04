@@ -2,7 +2,7 @@
 
 ## Core idea
 
-External workflows (for example Spec Kit) define the development lifecycle; OpenCode agents define who performs or reviews a bounded part of that lifecycle. Do not map every workflow stage to a separate agent. Keep one primary developer selected so feature work and implementation have a single owner.
+Development workflows define the engineering stages; OpenCode agents define who performs or reviews a bounded part of that work. Do not map every workflow stage to a separate agent. Keep one primary developer selected so feature work and implementation have a single owner.
 
 ## Recommended selection matrix
 

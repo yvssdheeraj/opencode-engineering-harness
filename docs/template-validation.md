@@ -15,7 +15,7 @@ python3 -m unittest discover -s tests -v
 python3 scripts/validate_harness.py --mode project
 ```
 
-`--mode project` runs every template integrity check and additionally verifies that `AGENTS.md` `TODO` placeholders have been populated and checks for `.specify/memory/constitution.md`, `.opencode/commands/`, and installed `opencode` / `specify` CLIs.
+`--mode project` runs every template integrity check and additionally verifies that `AGENTS.md` `TODO` placeholders have been populated, checks for conflicting duplicate OpenCode config files, and checks whether the `opencode` CLI is installed.
 
 ## Structure and traceability checklist
 
@@ -35,13 +35,11 @@ python3 scripts/validate_harness.py --mode project
 - [ ] Shell approvals and web/external access match the team's risk tolerance.
 - [ ] Permission syntax has been checked against the installed OpenCode release; do not mix V1 and V2 configuration formats.
 
-## Repository and Spec Kit integration
+## Repository readiness
 
 - [ ] Root `AGENTS.md` project facts and exact commands are populated.
-- [ ] Spec Kit `/speckit.*` commands are installed and remain intact.
-- [ ] Existing `.opencode/commands/`, event/plugin configuration, and user instructions are preserved.
-- [ ] The project constitution is concise and does not duplicate the full detailed rule catalogue.
-- [ ] Feature-specific requirements remain in feature artifacts.
+- [ ] Existing `.opencode/commands/`, plugin configuration, and user instructions are preserved.
+- [ ] Feature-specific requirements remain in feature or task artifacts.
 
 ## Runtime pilot
 
@@ -50,6 +48,6 @@ python3 scripts/validate_harness.py --mode project
 - [ ] Confirm specialist agents can be invoked by their configured names.
 - [ ] Verify reviewer agents cannot edit/write files or execute non-read-only shell commands.
 - [ ] Verify the developer selects only relevant detailed rules and technology skills.
-- [ ] Run one low-risk Spec Kit feature through implementation, review, verification, and convergence.
+- [ ] Run one low-risk feature or bug fix through implementation, review, and verification.
 - [ ] Confirm final reports distinguish executed checks from passed checks and skipped checks.
 - [ ] Add executable CI enforcement for repeatable quality gates; prompt rules alone are not enforcement.

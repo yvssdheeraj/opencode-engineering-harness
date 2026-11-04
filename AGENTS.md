@@ -61,7 +61,7 @@ The primary `developer` agent is the single write-owner by default; `explorer` a
 
 ## External integrations (optional)
 
-- If feature artifacts (spec, plan, tasks) or generated command integrations (for example `.opencode/commands/`, `.specify/`, `specs/`) exist, treat them as read-only inputs unless the owning workflow explicitly says to update them.
+- If feature artifacts (spec, plan, tasks) or generated command integrations (for example `.opencode/commands/`) exist, treat them as read-only inputs unless the owning workflow explicitly says to update them.
 - Do not shadow or recreate existing slash commands.
 - Preserve generated integration configuration.
 - Do not mark tasks complete without actual implementation and evidence.

@@ -8,12 +8,6 @@ OpenCode combines repository instructions (`AGENTS.md`) and configured instructi
 
 ## Loaded conditionally
 
-Root `AGENTS.md` contains a routing matrix. The agent identifies affected domains and reads the corresponding detailed `.opencode/rules/engineering/*.md` files and workflow files before planning, implementation, or review.
-
-Conditional loading is an explicit agent procedure. It is not an automatic rule engine that evaluates file paths. The agent must use its read tool to load each referenced document that applies.
-
-## Selecting rules and skills
-
 Root `AGENTS.md` contains the routing table. The agent identifies affected domains and reads the corresponding detailed `.opencode/rules/engineering/*.md` files and workflow files before planning, implementation, or review.
 
 Conditional loading is an explicit agent procedure. It is not an automatic rule engine. The agent must use its read tool to load each referenced document that applies. Record the selected rules, skills, quality gates, and reviewers in a short `Selected rules & skills` note so omitted domains are visible during execution and review.
